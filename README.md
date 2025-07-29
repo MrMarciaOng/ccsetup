@@ -48,7 +48,9 @@ Examples:
 ## What's Included
 
 The boilerplate template creates:
+
 - **CLAUDE.md** - Project instructions for Claude
+- **GEMINI.md** - (Optional) Waterfall Architect prompt for comprehensive task planning - optimized for Gemini's larger context window
 - **agents/** - Specialized AI agents (planner, coder, checker, etc.)
 - **tickets/** - Task tracking system
 - **plans/** - Project planning documents
@@ -76,6 +78,7 @@ The boilerplate template creates:
 ## Usage
 
 1. Create a new project:
+
    ```bash
    npx ccsetup my-awesome-project
    cd my-awesome-project
@@ -103,21 +106,26 @@ When running in the current directory (`npx ccsetup .`), it will check for Claud
 The boilerplate includes 50+ specialized agents covering all aspects of development:
 
 ### Core Development Agents
+
 - **planner.md** - Strategic planning and task breakdown
 - **coder.md** - Implementation and development
 - **checker.md** - Testing and quality assurance
 - **researcher.md** - Research and information gathering
 
 ### Language Specialists
+
 - **python-pro.md**, **golang-pro.md**, **rust-pro.md**, **javascript-pro.md**, **c-pro.md**, **cpp-pro.md**, **sql-pro.md**
 
 ### Infrastructure & Operations
+
 - **devops-troubleshooter.md**, **cloud-architect.md**, **terraform-specialist.md**, **database-admin.md**, **network-engineer.md**
 
 ### Quality & Security
+
 - **code-reviewer.md**, **security-auditor.md**, **test-automator.md**, **performance-engineer.md**
 
 ### And Many More!
+
 Over 50 specialized agents for frontend, backend, blockchain, ML/AI, business analysis, and more!
 
 📖 **[View all agents with detailed descriptions →](https://github.com/MrMarciaOng/ccsetup/blob/main/template/agents/README.md)**
@@ -155,11 +163,13 @@ Choose your agents:
 ```
 
 You can also use flags to control agent selection:
+
 - `--all-agents` - Include all available agents
 - `--no-agents` - Skip agent selection entirely
 - `--agents` - Preview available agents without creating a project
 
 Example:
+
 ```bash
 # Include all agents without prompting
 npx ccsetup my-project --all-agents
@@ -181,12 +191,14 @@ npx ccsetup my-project --browse-agents
 ```
 
 In browse mode:
+
 - All 50+ agents are copied to your project's `/agents` folder
 - You can read through each agent to understand their capabilities
 - Manually copy the ones you want to `~/.claude/agents` when ready
 - No overwhelming selection process during setup!
 
 Example workflow:
+
 ```bash
 # 1. Create project with browse mode
 npx ccsetup my-project --browse-agents
@@ -204,6 +216,7 @@ cp python-pro.md ~/.claude/agents/
 ```
 
 This approach is perfect when you:
+
 - Want to explore all available agents
 - Prefer to choose agents based on your project needs as they arise
 - Don't want to be overwhelmed with 50+ choices during setup
@@ -223,10 +236,11 @@ Conflict resolution options:
   2) rename    (r) - Save template files with -ccsetup suffix
   3) overwrite (o) - Replace with template versions
 
-Your choice for CLAUDE.md [s/r/o]: 
+Your choice for CLAUDE.md [s/r/o]:
 ```
 
 Categories are handled separately:
+
 - **CLAUDE.md** - Project instructions (warns before overwriting)
 - **Agents** - AI agent files
 - **Documentation** - docs/ folder files
@@ -313,11 +327,13 @@ The template includes powerful agent orchestration workflows that guide Claude t
 ### 💡 How to Use Agent Orchestration
 
 1. **Read the orchestration guide**:
+
    ```
    "Read docs/agent-orchestration.md to understand available workflows"
    ```
 
 2. **Choose your workflow**:
+
    - Feature Development: Complex new features
    - Bug Fix: Investigating and fixing issues
    - Refactoring: Improving code quality
@@ -327,6 +343,7 @@ The template includes powerful agent orchestration workflows that guide Claude t
    - QA: Quality assurance
 
 3. **Let Claude guide you**:
+
    ```
    "I need to [your task]. Which workflow should we use?"
    ```
@@ -343,24 +360,28 @@ The orchestration ensures nothing is missed and follows best practices automatic
 After setting up your project with `ccsetup`:
 
 1. **Open Claude Code** in your project directory:
+
    ```bash
    cd my-awesome-project
    claude
    ```
 
 2. **Let Claude understand your project** by asking:
+
    - "Read the CLAUDE.md file to understand this project"
    - "Check the roadmap in docs/ROADMAP.md"
    - "What agents are available in the agents directory?"
    - "Read the README files in docs, tickets, and plans folders to understand the workflow"
 
 3. **Start working** with Claude:
+
    - Use the planner agent: "Use the planner agent to help me design a user authentication system"
    - Create tickets: "Create a ticket for implementing user login"
    - Implement features: "Use the coder agent to implement the login functionality"
    - Review code: "Use the checker agent to review the code we just wrote"
 
 4. **Important setup steps**:
+
    - **Update ROADMAP.md**: Define your project's goals, features, and development phases
    - **Read folder documentation**: Each folder (docs/, tickets/, plans/) has a README explaining its purpose and format
    - **Customize CLAUDE.md**: Add project-specific instructions, commands, and context
@@ -375,6 +396,7 @@ After setting up your project with `ccsetup`:
 ## Features
 
 ### Core Features
+
 - ✅ Pre-configured project structure for Claude Code
 - 🤖 50+ specialized agents from the [wshobson/agents](https://github.com/wshobson/agents) collection - [view all →](https://github.com/MrMarciaOng/ccsetup/blob/main/template/agents/README.md)
 - 🎫 Built-in ticket and planning system
@@ -382,6 +404,7 @@ After setting up your project with `ccsetup`:
 - 📁 Automatic .claude directory integration
 
 ### CLI Features
+
 - 🎯 Interactive agent selection with descriptions
 - 🔄 Smart conflict resolution (skip/rename/overwrite)
 - 👀 Dry-run mode to preview changes
@@ -390,7 +413,9 @@ After setting up your project with `ccsetup`:
 - 🛡️ Security validations for file operations
 
 ### Agent Orchestration
+
 The template includes `docs/agent-orchestration.md` which defines workflows for:
+
 - **Feature Development** - Researcher → Planner → Coder → Checker
 - **Bug Fixes** - Researcher → Coder → Checker
 - **Refactoring** - Researcher → Planner → Coder → Checker
