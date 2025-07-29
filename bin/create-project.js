@@ -12,7 +12,8 @@ const flags = {
   help: false,
   allAgents: false,
   noAgents: false,
-  agents: false
+  agents: false,
+  browseAgents: false
 };
 
 let projectName = '.';
@@ -32,6 +33,8 @@ for (let i = 0; i < args.length; i++) {
     flags.noAgents = true;
   } else if (arg === '--agents') {
     flags.agents = true;
+  } else if (arg === '--browse-agents') {
+    flags.browseAgents = true;
   } else if (!arg.startsWith('-')) {
     projectName = arg;
   }
@@ -48,15 +51,17 @@ Options:
   --agents        Interactive agent selection mode
   --all-agents    Include all agents without prompting
   --no-agents     Skip agent selection entirely
+  --browse-agents Copy all agents to /agents folder for browsing
   --help, -h      Show this help message
 
 Examples:
-  ccsetup                    # Create in current directory
-  ccsetup my-project         # Create in new directory
-  ccsetup . --force          # Overwrite files in current directory
-  ccsetup my-app --dry-run   # Preview changes without creating files
-  ccsetup --agents           # Interactive agent selection only
-  ccsetup my-app --all-agents # Include all agents automatically
+  ccsetup                      # Create in current directory
+  ccsetup my-project           # Create in new directory
+  ccsetup . --force            # Overwrite files in current directory
+  ccsetup my-app --dry-run     # Preview changes without creating files
+  ccsetup --agents             # Interactive agent selection only
+  ccsetup my-app --all-agents  # Include all agents automatically
+  ccsetup --browse-agents      # Copy all agents for manual selection
 `);
   process.exit(0);
 }
@@ -80,6 +85,11 @@ function validateProjectName(name) {
 // Validate conflicting flags
 if (flags.allAgents && flags.noAgents) {
   console.error('Error: Cannot use --all-agents and --no-agents together');
+  process.exit(1);
+}
+
+if (flags.browseAgents && (flags.allAgents || flags.noAgents || flags.agents)) {
+  console.error('Error: --browse-agents cannot be used with other agent flags');
   process.exit(1);
 }
 
@@ -658,19 +668,60 @@ async function main() {
   if (flags.noAgents) {
     selectedAgentFiles = [];
     console.log('\n⏭️  Skipping agent selection (--no-agents flag)');
+  } else if (flags.browseAgents) {
+    selectedAgentFiles = [];
+    console.log('\n📚 Browse mode enabled - all agents will be copied to /agents folder');
+    console.log('   You can manually copy desired agents to ~/.claude/agents later');
   } else if (flags.allAgents) {
     selectedAgentFiles = availableAgents.map(a => a.file).filter(validateAgentFile);
     console.log(`\n✅ Including all ${selectedAgentFiles.length} agents (--all-agents flag)`);
   } else if (!flags.dryRun) {
+    // Interactive mode selection
+    console.log('\n🤖 How would you like to set up agents for your Claude Code project?\n');
+    console.log('Use arrow keys to navigate, Enter to select\n');
+    
     // Close readline interface before using inquirer
     if (rl) {
       rl.close();
       rl = null;
     }
     
-    // Interactive selection
-    selectedAgentFiles = await selectAgents(availableAgents);
-    console.log(`\n✅ Selected ${selectedAgentFiles.length} agent${selectedAgentFiles.length === 1 ? '' : 's'}`);
+    // Import select for mode selection
+    const selectModule = await import('@inquirer/select');
+    const select = selectModule.default;
+    
+    const agentMode = await select({
+      message: 'Choose your setup mode:',
+      choices: [
+        {
+          name: 'Browse Mode - Copy all 50+ agents to /agents folder (explore later)',
+          value: 'browse'
+        },
+        {
+          name: 'Select Agents - Choose specific agents to include now',
+          value: 'select'
+        },
+        {
+          name: 'Skip - Don\'t include any agents',
+          value: 'skip'
+        }
+      ]
+    });
+    
+    if (agentMode === 'browse') {
+      flags.browseAgents = true;
+      selectedAgentFiles = [];
+      console.log('\n📚 Browse mode selected - all agents will be copied to /agents folder');
+      console.log('   You can manually copy desired agents to ~/.claude/agents later');
+    } else if (agentMode === 'skip') {
+      flags.noAgents = true;
+      selectedAgentFiles = [];
+      console.log('\n⏭️  Skipping agent selection');
+    } else if (agentMode === 'select') {
+      // Interactive selection
+      selectedAgentFiles = await selectAgents(availableAgents);
+      console.log(`\n✅ Selected ${selectedAgentFiles.length} agent${selectedAgentFiles.length === 1 ? '' : 's'}`);
+    }
     
     // Recreate readline interface after agent selection
     if (!flags.force && !flags.dryRun) {
@@ -681,7 +732,8 @@ async function main() {
     }
   } else {
     // In dry-run mode, show what would happen
-    console.log(`\nWould prompt for agent selection from ${availableAgents.length} available agents`);
+    console.log(`\nWould prompt for agent selection mode`);
+    console.log(`Would then prompt for agent selection from ${availableAgents.length} available agents`);
     selectedAgentFiles = availableAgents.map(a => a.file).filter(validateAgentFile); // Include all for scanning purposes
   }
 
@@ -724,8 +776,13 @@ async function main() {
             dirConflicts.push(relativePath || '.');
           }
           
-          // Add selected agent files
-          for (const agentFile of selectedAgentFiles) {
+          // In browse mode, add ALL agent files
+          const agentFilesToProcess = flags.browseAgents 
+            ? availableAgents.map(a => a.file).filter(validateAgentFile)
+            : selectedAgentFiles;
+          
+          // Add agent files
+          for (const agentFile of agentFilesToProcess) {
             // Additional validation before processing
             if (!validateAgentFile(agentFile)) {
               console.warn(`⚠️  Skipping invalid agent file: ${agentFile}`);
@@ -1014,7 +1071,13 @@ async function main() {
     if (renamedCount > 0) console.log(`  📄 ${renamedCount} template files ${flags.dryRun ? 'would be' : ''} saved with -ccsetup suffix`);
     if (overwrittenCount > 0) console.log(`  ♻️  ${overwrittenCount} files ${flags.dryRun ? 'would be' : ''} replaced with template versions`);
     if (!flags.noAgents && !flags.dryRun) {
-      console.log(`  🤖 ${selectedAgentFiles.length} agent${selectedAgentFiles.length === 1 ? '' : 's'} ${flags.dryRun ? 'would be' : ''} included in /agents`);
+      if (flags.browseAgents) {
+        const agentCount = availableAgents.length;
+        console.log(`  📚 ${agentCount} agent${agentCount === 1 ? '' : 's'} ${flags.dryRun ? 'would be' : ''} copied to /agents for browsing`);
+      } else if (selectedAgentFiles.length > 0) {
+        console.log(`  🤖 ${selectedAgentFiles.length} agent${selectedAgentFiles.length === 1 ? '' : 's'} ${flags.dryRun ? 'would be' : ''} included in /agents`);
+        console.log(`  📝 Remember to update agent-orchestration.md with workflows for your agents`);
+      }
     }
     if (claudeInitResult && claudeInitResult.createdItems.length > 0) {
       console.log(`  📁 ${claudeInitResult.createdItems.length} items created in .claude directory`);
@@ -1034,7 +1097,17 @@ async function main() {
     }
     console.log('  1. Edit CLAUDE.md to add your project-specific instructions');
     console.log('  2. Update docs/ROADMAP.md with your project goals');
-    console.log('  3. Start creating tickets in the tickets/ directory');
+    console.log('  3. Update docs/agent-orchestration.md to define agent workflows');
+    console.log('  4. Start creating tickets in the tickets/ directory');
+    
+    if (flags.browseAgents) {
+      console.log('\n📚 Agent Browse Mode:');
+      console.log('  - All available agents have been copied to the /agents folder');
+      console.log('  - Browse through them to understand their capabilities');
+      console.log('  - Copy desired agents to ~/.claude/agents to activate them');
+      console.log('  - Example: cp agents/code-reviewer.md ~/.claude/agents/');
+      console.log('  - Remember to update agent-orchestration.md with your custom workflows');
+    }
     
     if (renamedCount > 0) {
       console.log('\n💡 Tip: Review the -ccsetup files to see template examples');

@@ -32,15 +32,17 @@ Options:
   --agents        Interactive agent selection mode
   --all-agents    Include all agents without prompting
   --no-agents     Skip agent selection entirely
+  --browse-agents Copy all agents to /agents folder for browsing
   --help, -h      Show help message
 
 Examples:
-  ccsetup                    # Create in current directory
-  ccsetup my-project         # Create in new directory
-  ccsetup . --force          # Overwrite files in current directory
-  ccsetup my-app --dry-run   # Preview changes without creating files
-  ccsetup --agents           # Interactive agent selection only
-  ccsetup my-app --all-agents # Include all agents automatically
+  ccsetup                      # Create in current directory
+  ccsetup my-project           # Create in new directory
+  ccsetup . --force            # Overwrite files in current directory
+  ccsetup my-app --dry-run     # Preview changes without creating files
+  ccsetup --agents             # Interactive agent selection only
+  ccsetup my-app --all-agents  # Include all agents automatically
+  ccsetup --browse-agents      # Copy all agents for manual selection
 ```
 
 ## What's Included
@@ -56,6 +58,7 @@ The boilerplate template creates:
 ## Key Features
 
 - 🎯 **Interactive Agent Selection** - Choose which agents to include during setup
+- 📚 **Browse Mode** - Copy all 50+ agents to explore and manually select later
 - 🔄 **Agent Orchestration Workflows** - Pre-defined workflows that automatically coordinate multiple agents for complex tasks
 - 🔒 **Smart Conflict Resolution** - Handle existing files with skip/rename/overwrite options
 - 📁 **.claude Directory Support** - Automatic creation of Claude Code directory structure
@@ -97,22 +100,45 @@ When running in the current directory (`npx ccsetup .`), it will check for Claud
 
 ## Using Agents
 
-The boilerplate includes several specialized agents in the `agents/` directory:
+The boilerplate includes 50+ specialized agents covering all aspects of development:
 
+### Core Development Agents
 - **planner.md** - Strategic planning and task breakdown
 - **coder.md** - Implementation and development
 - **checker.md** - Testing and quality assurance
 - **researcher.md** - Research and information gathering
-- **blockchain.md** - Web3 and smart contract development
-- **frontend.md** - UI/UX and frontend development
-- **backend.md** - API design and server-side development
-- **shadcn.md** - shadcn/ui component development
+
+### Language Specialists
+- **python-pro.md**, **golang-pro.md**, **rust-pro.md**, **javascript-pro.md**, **c-pro.md**, **cpp-pro.md**, **sql-pro.md**
+
+### Infrastructure & Operations
+- **devops-troubleshooter.md**, **cloud-architect.md**, **terraform-specialist.md**, **database-admin.md**, **network-engineer.md**
+
+### Quality & Security
+- **code-reviewer.md**, **security-auditor.md**, **test-automator.md**, **performance-engineer.md**
+
+### And Many More!
+Over 50 specialized agents for frontend, backend, blockchain, ML/AI, business analysis, and more!
+
+📖 **[View all agents with detailed descriptions →](https://github.com/MrMarciaOng/ccsetup/blob/main/template/agents/README.md)**
 
 ### Interactive Agent Selection
 
-During setup, ccsetup will prompt you to select which agents to include:
+During setup, ccsetup will prompt you to either:
+
+1. **Browse Mode** - Get all 50+ agents to explore later
+2. **Select Specific Agents** - Choose from curated list
 
 ```bash
+🤖 How would you like to set up agents for your Claude Code project?
+
+Use arrow keys to navigate, Enter to select
+
+> Browse Mode - Copy all 50+ agents to /agents folder (explore later)
+  Select Agents - Choose specific agents to include now
+  Skip - Don't include any agents
+
+# If you choose "Select Agents":
 🤖 Select agents to include in your Claude Code project
 
 Use arrow keys to navigate, space to select/deselect, 'a' to toggle all
@@ -144,6 +170,43 @@ npx ccsetup my-project --no-agents
 # Preview available agents only
 npx ccsetup --agents
 ```
+
+### Browse Mode - New Feature! 📚
+
+With 50+ specialized agents available, browse mode lets you explore all agents at your leisure:
+
+```bash
+# Copy all agents to /agents folder for browsing
+npx ccsetup my-project --browse-agents
+```
+
+In browse mode:
+- All 50+ agents are copied to your project's `/agents` folder
+- You can read through each agent to understand their capabilities
+- Manually copy the ones you want to `~/.claude/agents` when ready
+- No overwhelming selection process during setup!
+
+Example workflow:
+```bash
+# 1. Create project with browse mode
+npx ccsetup my-project --browse-agents
+
+# 2. Explore agents
+cd my-project/agents
+ls  # See all available agents
+
+# 3. Read agent descriptions
+cat code-reviewer.md
+
+# 4. Copy desired agents to activate them
+cp code-reviewer.md ~/.claude/agents/
+cp python-pro.md ~/.claude/agents/
+```
+
+This approach is perfect when you:
+- Want to explore all available agents
+- Prefer to choose agents based on your project needs as they arise
+- Don't want to be overwhelmed with 50+ choices during setup
 
 ### Conflict Resolution
 
@@ -313,7 +376,7 @@ After setting up your project with `ccsetup`:
 
 ### Core Features
 - ✅ Pre-configured project structure for Claude Code
-- 🤖 Multiple specialized agents for different tasks
+- 🤖 50+ specialized agents from the [wshobson/agents](https://github.com/wshobson/agents) collection - [view all →](https://github.com/MrMarciaOng/ccsetup/blob/main/template/agents/README.md)
 - 🎫 Built-in ticket and planning system
 - 📋 Ready-to-use boilerplate with best practices
 - 📁 Automatic .claude directory integration
@@ -339,6 +402,8 @@ The template includes `docs/agent-orchestration.md` which defines workflows for:
 ## Credits
 
 Born from our discussions in TechOverflow with [vichannnnn](https://github.com/vichannnnn) and [nasdin](https://github.com/nasdin)
+
+The 44 specialized agents collection is from [wshobson/agents](https://github.com/wshobson/agents) - an amazing collection of Claude Code subagents for every development need!
 
 ## License
 
