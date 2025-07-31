@@ -5,430 +5,93 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![npm downloads](https://img.shields.io/npm/dm/ccsetup.svg)](https://www.npmjs.com/package/ccsetup)
 
-Quick setup for Claude Code projects with built-in 50+ agents, ticket system, planning tools and agent orchestration workflow.
+Quick setup for Claude Code projects with 50+ built-in agents, orchestration workflows, and planning tools.
 
-## Installation
+## Quick Start
 
 ```bash
-# Create a new project
+# Create new project
 npx ccsetup my-project
 
 # Setup in current directory
 npx ccsetup .
 
-# Install globally (optional)
+# Global installation (optional)
 npm install -g ccsetup
-ccsetup my-project
 ```
 
-## Command Line Options
+## Core Features
 
-```bash
-ccsetup [project-name] [options]
+✨ **50+ Specialized Agents** - Expert agents for every development need  
+🔄 **Agent Orchestration** - Pre-defined workflows for systematic task execution  
+📋 **Task Management** - Built-in ticket system and planning tools  
+📁 **Claude Code Integration** - Automatic .claude directory setup  
+🎯 **Interactive Setup** - Choose agents during installation or browse later
 
-Options:
-  --force, -f     Skip all prompts and overwrite existing files
-  --dry-run, -d   Show what would be done without making changes
-  --agents        Interactive agent selection mode
-  --all-agents    Include all agents without prompting
-  --no-agents     Skip agent selection entirely
-  --browse-agents Copy all agents to /agents folder for browsing
-  --help, -h      Show help message
+## What You Get
 
-Examples:
-  ccsetup                      # Create in current directory
-  ccsetup my-project           # Create in new directory
-  ccsetup . --force            # Overwrite files in current directory
-  ccsetup my-app --dry-run     # Preview changes without creating files
-  ccsetup --agents             # Interactive agent selection only
-  ccsetup my-app --all-agents  # Include all agents automatically
-  ccsetup --browse-agents      # Copy all agents for manual selection
+```
+my-project/
+├── CLAUDE.md          # Project instructions for Claude
+├── agents/            # 50+ specialized AI agents
+├── docs/              # Documentation & workflows
+│   ├── ROADMAP.md     # Development roadmap
+│   └── agent-orchestration.md
+├── tickets/           # Task tracking system
+├── plans/             # Planning documents
+└── .claude/           # Claude Code directory
 ```
 
-## What's Included
-
-The boilerplate template creates:
-
-- **CLAUDE.md** - Project instructions for Claude
-- **GEMINI.md** - (Optional) Waterfall Architect prompt for comprehensive task planning - optimized for Gemini's larger context window
-- **agents/** - Specialized AI agents (planner, coder, checker, etc.)
-- **tickets/** - Task tracking system
-- **plans/** - Project planning documents
-- **docs/** - Documentation with ROADMAP.md and agent-orchestration.md
-- **.claude/** - Claude Code specific directory structure (created automatically)
-
-## Key Features
-
-- 🎯 **Interactive Agent Selection** - Choose which agents to include during setup
-- 📚 **Browse Mode** - Copy all 50+ agents to explore and manually select later
-- 🔄 **Agent Orchestration Workflows** - Pre-defined workflows that automatically coordinate multiple agents for complex tasks
-- 🔒 **Smart Conflict Resolution** - Handle existing files with skip/rename/overwrite options
-- 📁 **.claude Directory Support** - Automatic creation of Claude Code directory structure
-- 🏃 **Dry Run Mode** - Preview changes before applying them
-- ⚡ **Force Mode** - Skip all prompts for automated workflows
-- 🎨 **Standalone Agent Preview** - Explore available agents without setup
-- 🎭 **Systematic Task Execution** - Agents work in sequence, building on each other's outputs
-
-## Project Structure
-
-- **templates/** - The boilerplate templates that will be copied to user's project
-- **bin/** - CLI executable for ccsetup
-- **agents/**, **docs/**, **plans/**, **tickets/** - Working files for ccsetup development (not part of the template)
-
-## Usage
-
-1. Create a new project:
-
-   ```bash
-   npx ccsetup my-awesome-project
-   cd my-awesome-project
-   ```
-
-2. Edit `CLAUDE.md` with your project-specific instructions
-
-3. Update `docs/ROADMAP.md` with your project goals
-
-4. Start creating tickets in `tickets/` directory
-
-## Claude Code Integration
-
-ccsetup seamlessly integrates with Claude Code:
-
-- **Automatic Detection** - Checks if Claude Code is initialized in your project
-- **.claude Directory** - Creates Claude Code directory structure automatically
-- **Agent Installation** - Copies agents to `.claude/agents/` for native Claude Code support
-- **Smart Initialization** - Offers to create `.claude` directory if Claude Code isn't detected
-
-When running in the current directory (`npx ccsetup .`), it will check for Claude Code and provide instructions if not found. For new projects, ccsetup will remind you to initialize Claude Code after setup.
-
-## Using Agents
-
-The boilerplate includes 50+ specialized agents covering all aspects of development:
-
-### Core Development Agents
-
-- **planner.md** - Strategic planning and task breakdown
-- **coder.md** - Implementation and development
-- **checker.md** - Testing and quality assurance
-- **researcher.md** - Research and information gathering
-
-### Language Specialists
-
-- **python-pro.md**, **golang-pro.md**, **rust-pro.md**, **javascript-pro.md**, **c-pro.md**, **cpp-pro.md**, **sql-pro.md**
-
-### Infrastructure & Operations
-
-- **devops-troubleshooter.md**, **cloud-architect.md**, **terraform-specialist.md**, **database-admin.md**, **network-engineer.md**
-
-### Quality & Security
-
-- **code-reviewer.md**, **security-auditor.md**, **test-automator.md**, **performance-engineer.md**
-
-### And Many More!
-
-Over 50 specialized agents for frontend, backend, blockchain, ML/AI, business analysis, and more!
-
-📖 **[View all agents with detailed descriptions →](https://github.com/MrMarciaOng/ccsetup/blob/main/template/agents/README.md)**
-
-### Interactive Agent Selection
-
-During setup, ccsetup will prompt you to either:
-
-1. **Browse Mode** - Get all 50+ agents to explore later
-2. **Select Specific Agents** - Choose from curated list
+## Usage Examples
 
 ```bash
-🤖 How would you like to set up agents for your Claude Code project?
+# Interactive agent selection
+npx ccsetup my-project --agents
 
-Use arrow keys to navigate, Enter to select
-
-> Browse Mode - Copy all 50+ agents to /agents folder (explore later)
-  Select Agents - Choose specific agents to include now
-  Skip - Don't include any agents
-
-# If you choose "Select Agents":
-🤖 Select agents to include in your Claude Code project
-
-Use arrow keys to navigate, space to select/deselect, 'a' to toggle all
-
-Choose your agents:
-◯ backend - Backend development specialist for API design and server optimization
-◯ blockchain - Web3 and smart contract development expert
-◯ checker - Quality assurance and code review specialist
-◯ coder - Expert software developer for implementation
-◯ frontend - Frontend development specialist for UI/UX
-◯ planner - Strategic planning specialist for complex problems
-◯ researcher - Research specialist for documentation and code analysis
-◯ shadcn - shadcn/ui component library expert
-```
-
-You can also use flags to control agent selection:
-
-- `--all-agents` - Include all available agents
-- `--no-agents` - Skip agent selection entirely
-- `--agents` - Preview available agents without creating a project
-
-Example:
-
-```bash
-# Include all agents without prompting
+# Include all agents
 npx ccsetup my-project --all-agents
 
-# Create project without any agents
-npx ccsetup my-project --no-agents
-
-# Preview available agents only
-npx ccsetup --agents
-```
-
-### Browse Mode - New Feature! 📚
-
-With 50+ specialized agents available, browse mode lets you explore all agents at your leisure:
-
-```bash
-# Copy all agents to /agents folder for browsing
-npx ccsetup my-project --browse-agents
-```
-
-In browse mode:
-
-- All 50+ agents are copied to your project's `/agents` folder
-- You can read through each agent to understand their capabilities
-- Manually copy the ones you want to `~/.claude/agents` when ready
-- No overwhelming selection process during setup!
-
-Example workflow:
-
-```bash
-# 1. Create project with browse mode
+# Browse mode - explore agents later
 npx ccsetup my-project --browse-agents
 
-# 2. Explore agents
-cd my-project/agents
-ls  # See all available agents
-
-# 3. Read agent descriptions
-cat code-reviewer.md
-
-# 4. Copy desired agents to activate them
-cp code-reviewer.md ~/.claude/agents/
-cp python-pro.md ~/.claude/agents/
+# Preview without creating files
+npx ccsetup my-project --dry-run
 ```
 
-This approach is perfect when you:
+## Agent Orchestration Workflows
 
-- Want to explore all available agents
-- Prefer to choose agents based on your project needs as they arise
-- Don't want to be overwhelmed with 50+ choices during setup
+Pre-configured workflows that coordinate multiple agents:
 
-### Conflict Resolution
+- **Feature Development**: Researcher → Planner → Coder → Checker
+- **Bug Fix**: Researcher → Coder → Checker
+- **API Development**: Planner → Backend → Frontend → Checker
+- **UI Components**: Frontend → Shadcn → Checker
+- **Quality Assurance**: Full testing and validation pipeline
 
-When existing files are detected, ccsetup offers smart conflict resolution:
+[Learn more about workflows →](docs/agent-orchestration.md)
 
-```bash
-⚠️  File conflicts detected. You will be asked how to handle each category.
+## Documentation
 
-📄 CLAUDE.md conflicts:
-  - CLAUDE.md
+- 📖 [Command Line Options](docs/cli-usage.md)
+- 🤖 [Available Agents](template/agents/README.md)
+- 🔄 [Agent Orchestration](docs/agent-orchestration.md)
+- 🎯 [Interactive Setup Guide](docs/setup-guide.md)
+- 📋 [Ticket System](docs/ticket-system.md)
+- 🔧 [Conflict Resolution](docs/conflict-resolution.md)
+- 🚀 [Getting Started with Claude Code](docs/getting-started.md)
 
-Conflict resolution options:
-  1) skip      (s) - Keep your existing files
-  2) rename    (r) - Save template files with -ccsetup suffix
-  3) overwrite (o) - Replace with template versions
+## Quick Tips
 
-Your choice for CLAUDE.md [s/r/o]:
-```
-
-Categories are handled separately:
-
-- **CLAUDE.md** - Project instructions (warns before overwriting)
-- **Agents** - AI agent files
-- **Documentation** - docs/ folder files
-- **Plans** - plans/ folder files
-- **Tickets** - tickets/ folder files
-
-## Agent Orchestration Showcase
-
-The template includes powerful agent orchestration workflows that guide Claude through complex tasks systematically. Here are real-world examples:
-
-### 🚀 Feature Development Example
-
-**Scenario**: Building a user authentication system
-
-```bash
-# In Claude Code, you would say:
-"I need to add user authentication to my app. Use the feature development workflow to guide me through this."
-
-# Claude will automatically orchestrate:
-1. Researcher Agent → Analyzes existing codebase, identifies auth patterns
-2. Planner Agent → Creates detailed implementation plan with JWT, sessions, etc.
-3. Coder Agent → Implements auth endpoints, middleware, and UI components
-4. Checker Agent → Tests security, validates implementation, checks edge cases
-```
-
-### 🐛 Bug Fix Example
-
-**Scenario**: Users report login failures after 5 minutes
-
-```bash
-# You tell Claude:
-"Users are getting logged out after 5 minutes. Use the bug fix workflow to investigate and fix this."
-
-# Claude orchestrates:
-1. Researcher Agent → Investigates session handling, token expiry, logs
-2. Coder Agent → Fixes token refresh logic, updates session timeout
-3. Checker Agent → Verifies fix, tests edge cases, ensures no regressions
-```
-
-### 🏗️ API Development Example
-
-**Scenario**: Building a REST API for a blog platform
-
-```bash
-# You request:
-"Help me build a complete REST API for blog posts with CRUD operations. Follow the API development workflow."
-
-# Claude coordinates:
-1. Planner Agent → Designs RESTful endpoints, database schema, auth strategy
-2. Backend Agent → Implements controllers, models, middleware, validation
-3. Frontend Agent → Creates API client, integration examples (if needed)
-4. Checker Agent → Tests all endpoints, validates OpenAPI spec, security audit
-```
-
-### 🎨 UI Component Example
-
-**Scenario**: Creating a responsive dashboard with shadcn/ui
-
-```bash
-# You ask:
-"Create a dashboard with charts and stats cards using shadcn. Use the UI component workflow."
-
-# Claude executes:
-1. Frontend Agent → Designs component structure, responsive layout
-2. Shadcn Agent → Implements with shadcn/ui components, themes, animations
-3. Checker Agent → Tests responsiveness, accessibility, performance
-```
-
-### 🔍 Quality Assurance Example
-
-**Scenario**: Comprehensive review before deployment
-
-```bash
-# You request:
-"Run full QA on the authentication feature we just built."
-
-# Claude performs:
-1. Researcher Agent → Analyzes all changes, identifies test requirements
-2. Checker Agent → Runs security scans, performance tests, accessibility checks
-3. Coder Agent → Fixes any issues found
-4. Checker Agent → Final validation, generates QA report
-```
-
-### 💡 How to Use Agent Orchestration
-
-1. **Read the orchestration guide**:
-
-   ```
-   "Read docs/agent-orchestration.md to understand available workflows"
-   ```
-
-2. **Choose your workflow**:
-
-   - Feature Development: Complex new features
-   - Bug Fix: Investigating and fixing issues
-   - Refactoring: Improving code quality
-   - API Development: Building APIs
-   - UI Components: Frontend development
-   - Blockchain: Web3 features
-   - QA: Quality assurance
-
-3. **Let Claude guide you**:
-
-   ```
-   "I need to [your task]. Which workflow should we use?"
-   ```
-
-4. **Follow the flow**:
-   - Claude will automatically use agents in the correct sequence
-   - Each agent builds on the previous one's work
-   - You get systematic, thorough results
-
-The orchestration ensures nothing is missed and follows best practices automatically!
-
-## Getting Started with Claude Code
-
-After setting up your project with `ccsetup`:
-
-1. **Open Claude Code** in your project directory:
-
-   ```bash
-   cd my-awesome-project
-   claude
-   ```
-
-2. **Let Claude understand your project** by asking:
-
-   - "Read the CLAUDE.md file to understand this project"
-   - "Check the roadmap in docs/ROADMAP.md"
-   - "What agents are available in the agents directory?"
-   - "Read the README files in docs, tickets, and plans folders to understand the workflow"
-
-3. **Start working** with Claude:
-
-   - Use the planner agent: "Use the planner agent to help me design a user authentication system"
-   - Create tickets: "Create a ticket for implementing user login"
-   - Implement features: "Use the coder agent to implement the login functionality"
-   - Review code: "Use the checker agent to review the code we just wrote"
-
-4. **Important setup steps**:
-
-   - **Update ROADMAP.md**: Define your project's goals, features, and development phases
-   - **Read folder documentation**: Each folder (docs/, tickets/, plans/) has a README explaining its purpose and format
-   - **Customize CLAUDE.md**: Add project-specific instructions, commands, and context
-
-5. **Workflow tips**:
-   - Always start with planning for complex features
-   - Create tickets to track progress
-   - Use the appropriate agent for each task
-   - Keep CLAUDE.md updated with project-specific instructions
-   - Follow the workflow defined in docs/ROADMAP.md
-
-## Features
-
-### Core Features
-
-- ✅ Pre-configured project structure for Claude Code
-- 🤖 50+ specialized agents from the [wshobson/agents](https://github.com/wshobson/agents) collection - [view all →](https://github.com/MrMarciaOng/ccsetup/blob/main/template/agents/README.md)
-- 🎫 Built-in ticket and planning system
-- 📋 Ready-to-use boilerplate with best practices
-- 📁 Automatic .claude directory integration
-
-### CLI Features
-
-- 🎯 Interactive agent selection with descriptions
-- 🔄 Smart conflict resolution (skip/rename/overwrite)
-- 👀 Dry-run mode to preview changes
-- ⚡ Force mode for CI/CD pipelines
-- 🎨 Standalone agent preview mode
-- 🛡️ Security validations for file operations
-
-### Agent Orchestration
-
-The template includes `docs/agent-orchestration.md` which defines workflows for:
-
-- **Feature Development** - Researcher → Planner → Coder → Checker
-- **Bug Fixes** - Researcher → Coder → Checker
-- **Refactoring** - Researcher → Planner → Coder → Checker
-- **API Development** - Planner → Backend → Frontend → Checker
-- **UI Components** - Frontend → Shadcn → Checker
-- **Blockchain** - Planner → Blockchain → Checker
-- **Quality Assurance** - Researcher → Checker → Coder → Checker
+1. **After setup**: Read CLAUDE.md and docs/ROADMAP.md
+2. **Start working**: Use appropriate agents for your tasks
+3. **Track progress**: Create tickets in the tickets/ directory
+4. **Plan features**: Use the planner agent for complex tasks
 
 ## Credits
 
-Born from our discussions in TechOverflow with [vichannnnn](https://github.com/vichannnnn) and [nasdin](https://github.com/nasdin)
+Born from discussions in TechOverflow with [vichannnnn](https://github.com/vichannnnn) and [nasdin](https://github.com/nasdin).
 
-The 44 specialized agents collection is from [wshobson/agents](https://github.com/wshobson/agents) - an amazing collection of Claude Code subagents for every development need!
+Agent collection from [wshobson/agents](https://github.com/wshobson/agents).
 
 ## License
 
