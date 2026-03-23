@@ -10,7 +10,6 @@ const ProgressReporter = require('../lib/progressReporter');
 const TemplateCatalog = require('../lib/templates/catalog');
 const TemplateFilter = require('../lib/templates/filter');
 const TemplateSearch = require('../lib/templates/search');
-const AIAgentSelector = require('../lib/aiAgentSelector');
 
 // Parse CLI arguments
 const args = process.argv.slice(2);
@@ -52,9 +51,6 @@ for (let i = 0; i < args.length; i++) {
     flags.noAgents = true;
   } else if (arg === '--agents') {
     flags.agents = true;
-  } else if (arg === '--ai-agents') {
-    flags.aiAgents = true;
-    flags.agents = true; // AI agents implies agent selection
   } else if (arg === '--browse-agents') {
     flags.browseAgents = true;
   } else if (arg === '--browse') {
@@ -86,14 +82,15 @@ Options:
   --force, -f          Skip all prompts and overwrite existing files
   --dry-run, -d        Show what would be done without making changes
   --agents             Interactive agent selection mode
-  --ai-agents          AI-powered agent recommendations based on your project
   --all-agents         Include all agents without prompting
   --no-agents          Skip agent selection entirely
   --browse-agents      Copy all agents to /agents folder for browsing
   --browse             Enhanced template browsing and selection interface
   --scan-context       Scan repository and add context to CLAUDE.md
-  --install-hooks      Install workflow selection hook to .claude/hooks
   --help, -h           Show this help message
+
+Advanced:
+  --install-hooks      Install workflow selection hook to .claude/hooks (optional, power users only)
 
 Quick Start:
   npx ccsetup              # Interactive mode - choose what to do
@@ -214,9 +211,9 @@ async function shouldScanRepository() {
 
 async function mergeContextIntelligently(existingContent, repositoryContext, strategy = 'smart') {
   try {
-    // Handle overwrite strategy
-    if (strategy === 'overwrite') {
-      console.log('   ♻️  Overwriting with new scan results...');
+    // Handle replace strategy
+    if (strategy === 'replace') {
+      console.log('   Replacing with new scan results...');
       // Get template and apply context
       const templatePath = path.join(__dirname, '..', 'template', 'CLAUDE.md');
       let template = '';
@@ -1002,29 +999,19 @@ async function selectSetupMode() {
       'What would you like to do?',
     choices: claudeMdExists ? [
       {
-        name: '🔄 Update CLAUDE.md - Keep my content, add new findings',
+        name: 'Smart Merge - Keep my content, add new findings',
         value: 'scan-smart',
         description: 'Preserves your customizations while adding newly detected information'
       },
       {
-        name: '👀 Review Changes - See and approve each update',
-        value: 'scan-interactive',
-        description: 'Shows you each change before applying it to your CLAUDE.md'
-      },
-      {
-        name: '🆕 Fresh Start - Replace with new scan',
-        value: 'scan-only',
+        name: 'Replace - Fresh scan, replace existing',
+        value: 'scan-replace',
         description: 'Creates a brand new CLAUDE.md from your current codebase'
       },
       {
-        name: '🏗️  Full Setup - Add agents and project structure',
+        name: 'Full Setup - Add agents and project structure',
         value: 'full',
-        description: 'Creates the complete Claude Code boilerplate structure with workflow hooks'
-      },
-      {
-        name: '🪝  Install Hooks - Add workflow selection hook to .claude',
-        value: 'install-hooks',
-        description: 'Installs pre-hook for automatic workflow selection in Claude Code'
+        description: 'Creates the complete Claude Code boilerplate structure with agents, docs, tickets, and plans'
       }
     ] : [
       {
@@ -1035,12 +1022,7 @@ async function selectSetupMode() {
       {
         name: '🏗️  Full Setup - Complete Claude Code structure',
         value: 'full',
-        description: 'Creates CLAUDE.md plus agents, docs, tickets, plans, and workflow hooks'
-      },
-      {
-        name: '🪝  Install Hooks - Add workflow selection hook',
-        value: 'install-hooks',
-        description: 'Installs pre-hook for automatic workflow selection in Claude Code'
+        description: 'Creates CLAUDE.md plus agents, docs, tickets, and plans'
       }
     ]
   });
@@ -1128,18 +1110,13 @@ async function scanOnlyMode(defaultMergeStrategy = 'smart') {
   
   // Provide context based on merge strategy
   switch (defaultMergeStrategy) {
-    case 'interactive':
-      console.log('📋 Interactive Review Mode');
-      console.log('You\'ll review each change before it\'s applied to CLAUDE.md');
-      console.log('Perfect for: Careful updates when you have custom content to preserve\n');
-      break;
     case 'smart':
-      console.log('🧠 Smart Update Mode');
+      console.log('Smart Merge Mode');
       console.log('Intelligently merges new findings with your existing CLAUDE.md');
-      console.log('Perfect for: Regular updates that preserve your customizations\n');
+      console.log('Preserves your customizations while adding newly detected information\n');
       break;
-    case 'overwrite':
-      console.log('♻️  Fresh Scan Mode');
+    case 'replace':
+      console.log('Replace Mode');
       console.log('Creates a brand new CLAUDE.md from your current codebase');
       console.log('Perfect for: Starting fresh or major project restructuring\n');
       break;
@@ -1269,64 +1246,40 @@ Please update this file with relevant project information as you develop.
       if (!flags.force && !flags.dryRun) {
         console.log('\n📋 Existing CLAUDE.md detected!');
         
-        // Get AI suggestion for merge strategy if available
-        const existingContent = fs.readFileSync(claudeMdPath, 'utf8');
-        const merger = new ContextMerger(existingContent, repositoryContext);
-        const aiSuggestedStrategy = await merger.aiHelper.analyzeMergeStrategy(
-          existingContent, 
-          repositoryContext.formattedContext
-        );
-        
-        if (aiSuggestedStrategy) {
-          const strategyDescriptions = {
-            'smart': '🧠 Smart Merge - Intelligently combine sections',
-            'interactive': '👀 Interactive - Review each change',
-            'overwrite': '🔄 Fresh Scan - Replace with new content',
-            'preserve': '🛡️ Preserve - Keep existing content'
-          };
-          console.log(`🤖 AI Recommendation: ${strategyDescriptions[aiSuggestedStrategy] || aiSuggestedStrategy}`);
-          console.log('');
-        }
-        
         // Use the default merge strategy if provided
-        if (defaultMergeStrategy === 'interactive') {
-          console.log('Using interactive merge mode - you\'ll review each change.');
-          mergeStrategy = 'interactive';
-        } else if (defaultMergeStrategy === 'overwrite') {
-          console.log('⚠️  This will replace your existing CLAUDE.md with a fresh scan.');
+        if (defaultMergeStrategy === 'replace') {
+          console.log('This will replace your existing CLAUDE.md with a fresh scan.');
           console.log('   Your current content will be backed up first.');
-          // Use inquirer instead of readline prompt
           const confirmModule = await import('@inquirer/confirm');
           const confirm = confirmModule.default;
           const shouldProceed = await confirm({
-            message: 'Proceed with fresh scan?',
+            message: 'Proceed with replacement?',
             default: false
           });
           if (!shouldProceed) {
-            console.log('✅ Cancelled.');
+            console.log('Cancelled.');
             if (rl) rl.close();
             return;
           }
-          mergeStrategy = 'overwrite';
+          mergeStrategy = 'replace';
         } else {
           console.log('The scan will:');
           console.log('  • Preserve all your existing content');
-          console.log('  • Update the Additional Notes section with new findings');
+          console.log('  • Add new findings from the scan');
           console.log('  • Create an automatic backup');
-          
-          // Use inquirer instead of readline prompt
+
           const confirmModule = await import('@inquirer/confirm');
           const confirm = confirmModule.default;
           const shouldContinue = await confirm({
-            message: 'Continue with smart update?',
+            message: 'Continue with smart merge?',
             default: true
           });
           if (!shouldContinue) {
-            console.log('✅ Update cancelled.');
+            console.log('Update cancelled.');
             if (rl) rl.close();
             return;
           }
-          mergeStrategy = defaultMergeStrategy;
+          mergeStrategy = 'smart';
         }
       } else {
         mergeStrategy = defaultMergeStrategy;
@@ -2067,83 +2020,7 @@ async function main() {
   } else if (flags.allAgents) {
     selectedAgentFiles = availableAgents.map(a => a.file).filter(validateAgentFile);
     console.log(`\n✅ Including all ${selectedAgentFiles.length} agents (--all-agents flag)`);
-  } else if (flags.aiAgents && !flags.dryRun) {
-    // AI-powered agent selection
-    console.log('\n🤖 Analyzing your project to recommend agents...\n');
-    
-    // Get project scan results if available
-    let scanResults = null;
-    if (hasExistingFiles || flags.scanContext || repositoryContext) {
-      scanResults = repositoryContext?.scanResults || (await scanRepositoryForContext(targetDir))?.scanResults;
-    }
-    
-    if (scanResults) {
-      const catalog = new TemplateCatalog();
-      await catalog.load();
-      const aiSelector = new AIAgentSelector(scanResults, catalog.cache);
-      
-      const recommendations = await aiSelector.recommendAgents(5);
-      
-      if (recommendations && recommendations.length > 0) {
-        console.log('🎯 AI Agent Recommendations:\n');
-        recommendations.forEach((rec, index) => {
-          const priority = rec.priority === 'HIGH' ? '🔴' : rec.priority === 'MEDIUM' ? '🟡' : '🟢';
-          console.log(`${priority} ${index + 1}. ${rec.agent.name} - ${rec.agent.purpose}`);
-          console.log(`   💡 ${rec.reason}\n`);
-        });
-        
-        // Let user choose from recommendations
-        const selectModule = await import('@inquirer/select');
-        const select = selectModule.default;
-        
-        const choice = await select({
-          message: 'How would you like to proceed?',
-          choices: [
-            { name: '✅ Use all recommended agents', value: 'all' },
-            { name: '🎯 Select from recommendations', value: 'select' },
-            { name: '🔍 Browse all agents instead', value: 'browse' }
-          ]
-        });
-        
-        if (choice === 'all') {
-          selectedAgentFiles = recommendations.map(rec => 
-            availableAgents.find(a => a.name === rec.agent.name)?.file
-          ).filter(Boolean);
-          console.log(`\n✅ Selected all ${selectedAgentFiles.length} recommended agents`);
-        } else if (choice === 'select') {
-          const checkboxModule = await import('@inquirer/checkbox');
-          const checkbox = checkboxModule.default;
-          
-          const selected = await checkbox({
-            message: 'Select agents from recommendations:',
-            choices: recommendations.map(rec => ({
-              name: `${rec.agent.name} - ${rec.reason}`,
-              value: rec.agent.name,
-              checked: rec.priority === 'HIGH'
-            }))
-          });
-          
-          selectedAgentFiles = selected.map(name => 
-            availableAgents.find(a => a.name === name)?.file
-          ).filter(Boolean);
-          console.log(`\n✅ Selected ${selectedAgentFiles.length} agent${selectedAgentFiles.length === 1 ? '' : 's'}`);
-        } else {
-          // Fall through to regular selection
-          flags.aiAgents = false;
-          flags.agents = true;
-        }
-      } else {
-        console.log('⚠️  Could not generate AI recommendations. Falling back to regular selection.\n');
-        flags.aiAgents = false;
-        flags.agents = true;
-      }
-    } else {
-      console.log('⚠️  Need to scan project first to generate AI recommendations.');
-      console.log('💡 Tip: Use --scan-context with --ai-agents for better recommendations.\n');
-      flags.aiAgents = false;
-      flags.agents = true;
-    }
-  } else if (!flags.dryRun && !flags.aiAgents) {
+  } else if (!flags.dryRun) {
     // Interactive mode selection
     console.log('\n🤖 How would you like to set up agents for your Claude Code project?\n');
     console.log('Use arrow keys to navigate, Enter to select\n');
