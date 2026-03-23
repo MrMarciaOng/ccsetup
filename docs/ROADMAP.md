@@ -25,7 +25,7 @@ ccsetup is a CLI scaffolding tool that creates ready-to-use Claude Code project 
 
 - [x] Simplify merge strategies (reduce from 5 to 2: smart merge + replace)
 - [ ] Demote hooks system to optional/advanced feature
-- [ ] Consolidate docs directory (12 files → ~6)
+- [x] Consolidate docs directory (12 files → 6)
 
 ## Future Enhancements
 
