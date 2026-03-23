@@ -184,3 +184,7 @@ credentials/
 # Custom project specific
 .claude/
 .cache/
+
+# Test artifact directories
+ccsetup-e2e-*/
+ccsetup-tests-*/
