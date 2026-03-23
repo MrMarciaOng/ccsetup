@@ -15,9 +15,9 @@
 ```
 .
 ├── CLAUDE.md          # This file - project instructions for Claude
-├── .claude/           # Claude Code configuration (auto-generated)
-│   └── agents/        # Project-specific agent overrides
-├── agents/            # Custom agents for specialized tasks
+├── .claude/
+│   └── agents/        # 8 core agents (backend, blockchain, checker, coder, frontend, planner, researcher, shadcn)
+├── agents/            # Documentation only — see .claude/agents/ for active agents
 ├── docs/              # Project documentation
 ├── plans/             # Project plans and architectural documents
 └── tickets/           # Task tickets and issues
@@ -58,11 +58,11 @@
 
 ## Agents
 
-See @agents/README.md for available agents and their purposes
+8 core agents are pre-installed in `.claude/agents/`. See @agents/README.md for the full list and instructions for adding custom agents.
 
 ## Agent Orchestration
 
-After adding the agents you want to in `./claude/agents` folder, setup the workflow for Claude code to follow
+See @docs/agent-orchestration.md for detailed workflow patterns on how to chain agents effectively.
 
 ## Tickets
 

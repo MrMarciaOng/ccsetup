@@ -1,95 +1,85 @@
 # ccsetup
 
 [![npm version](https://img.shields.io/npm/v/ccsetup.svg)](https://www.npmjs.com/package/ccsetup)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/marcia-ong/ccsetup/pulls)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![npm downloads](https://img.shields.io/npm/dm/ccsetup.svg)](https://www.npmjs.com/package/ccsetup)
 
-Quick setup for Claude Code projects with 50+ built-in agents, orchestration workflows, and planning tools.
+One-command setup for Claude Code projects. Creates a ready-to-use project structure with 8 core agents, orchestration workflows, ticket system, and planning tools.
 
 ## Quick Start
 
 ```bash
+# Interactive mode
+npx ccsetup
+
 # Create new project
 npx ccsetup my-project
 
 # Setup in current directory
 npx ccsetup .
-
-# Global installation (optional)
-npm install -g ccsetup
 ```
-
-## Core Features
-
-✨ **50+ Specialized Agents** - Expert agents for every development need  
-🔄 **Agent Orchestration** - Pre-defined workflows for systematic task execution  
-📋 **Task Management** - Built-in ticket system and planning tools  
-📁 **Claude Code Integration** - Automatic .claude directory setup  
-🎯 **Interactive Setup** - Choose agents during installation or browse later
 
 ## What You Get
 
 ```
 my-project/
-├── CLAUDE.md          # Project instructions for Claude
-├── agents/            # 50+ specialized AI agents
-├── docs/              # Documentation & workflows
-│   ├── ROADMAP.md     # Development roadmap
+├── CLAUDE.md              # Project instructions for Claude
+├── .claude/
+│   ├── agents/            # 8 core agents
+│   └── settings.json
+├── docs/
+│   ├── ROADMAP.md         # Development roadmap
 │   └── agent-orchestration.md
-├── tickets/           # Task tracking system
-├── plans/             # Planning documents
-└── .claude/           # Claude Code directory
+├── tickets/               # Task tracking
+└── plans/                 # Planning documents
 ```
 
-## Usage Examples
+### Core Agents
+
+backend, blockchain, checker, coder, frontend, planner, researcher, shadcn
+
+## Key Options
 
 ```bash
-# Interactive agent selection
-npx ccsetup my-project --agents
-
-# Include all agents
-npx ccsetup my-project --all-agents
-
-# Browse mode - explore agents later
-npx ccsetup my-project --browse-agents
-
-# Preview without creating files
-npx ccsetup my-project --dry-run
+npx ccsetup my-project --agents        # Interactive agent selection
+npx ccsetup my-project --all-agents    # Include all agents
+npx ccsetup . --scan-context           # Scan existing project for context
+npx ccsetup --scan-only                # Only scan and update CLAUDE.md
+npx ccsetup my-project --dry-run       # Preview without creating files
+npx ccsetup my-project --force         # Skip prompts, overwrite existing
 ```
 
-## Agent Orchestration Workflows
+### Repository Scanning
 
-Pre-configured workflows that coordinate multiple agents:
+Scan existing projects to auto-generate CLAUDE.md context:
+
+```bash
+ccsetup scan                           # Scan current directory
+ccsetup scan --update                  # Update existing CLAUDE.md
+ccsetup scan --update --merge-strategy interactive  # Review each change
+```
+
+Detects languages, frameworks, project structure, and commands from package.json/Makefile/Docker Compose.
+
+## Agent Workflows
+
+Pre-configured multi-agent workflows:
 
 - **Feature Development**: Researcher → Planner → Coder → Checker
 - **Bug Fix**: Researcher → Coder → Checker
 - **API Development**: Planner → Backend → Frontend → Checker
 - **UI Components**: Frontend → Shadcn → Checker
-- **Quality Assurance**: Full testing and validation pipeline
 
-[Learn more about workflows →](docs/agent-orchestration.md)
+See [docs/agent-orchestration.md](docs/agent-orchestration.md) for details.
 
 ## Documentation
 
-- 📖 [Command Line Options](docs/cli-usage.md)
-- 🤖 [Available Agents](template/agents/README.md)
-- 🔄 [Agent Orchestration](docs/agent-orchestration.md)
-- 🎯 [Interactive Setup Guide](docs/setup-guide.md)
-- 📋 [Ticket System](docs/ticket-system.md)
-- 🔧 [Conflict Resolution](docs/conflict-resolution.md)
-- 🚀 [Getting Started with Claude Code](docs/getting-started.md)
-
-## Quick Tips
-
-1. **After setup**: Read CLAUDE.md and docs/ROADMAP.md
-2. **Start working**: Use appropriate agents for your tasks
-3. **Track progress**: Create tickets in the tickets/ directory
-4. **Plan features**: Use the planner agent for complex tasks
+- [Agent Orchestration](docs/agent-orchestration.md)
+- [Available Agents](template/agents/README.md)
+- [Ticket System](docs/ticket-system.md)
 
 ## Credits
 
-Born from discussions in TechOverflow with [vichannnnn](https://github.com/vichannnnn) and [nasdin](https://github.com/nasdin).
+Born from discussions in TechOverflow with [vichannnnn](https://github.com/vichannnnn), [MrMarciaOng](https://github.com/MrMarciaOng), and [nasdin](https://github.com/nasdin).
 
 Agent collection from [wshobson/agents](https://github.com/wshobson/agents).
 

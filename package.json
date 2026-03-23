@@ -1,7 +1,7 @@
 {
   "name": "ccsetup",
-  "version": "1.1.1",
-  "description": "Boilerplate for Claude Code projects with 50+ agents, tickets, plans, agent orchestration, and browse mode",
+  "version": "1.2.0",
+  "description": "Interactive setup for Claude Code projects with smart context scanning, merge strategies, 50+ agents, and orchestration workflows",
   "bin": {
     "ccsetup": "bin/create-project.js"
   },
@@ -26,6 +26,7 @@
   "homepage": "https://github.com/MrMarciaOng/ccsetup#readme",
   "files": [
     "bin/",
+    "lib/",
     "template/",
     "README.md"
   ],
@@ -34,7 +35,11 @@
   },
   "dependencies": {
     "@inquirer/checkbox": "^4.0.4",
-    "@inquirer/select": "^4.0.4"
+    "@inquirer/select": "^4.0.4",
+    "@inquirer/confirm": "^5.0.0",
+    "@inquirer/prompts": "^7.0.0",
+    "clipboardy": "^4.0.0",
+    "minimatch": "^9.0.0"
   },
   "devDependencies": {
     "jest": "^30.0.5"
@@ -42,6 +47,8 @@
   "scripts": {
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage"
+    "test:coverage": "jest --coverage",
+    "metadata:generate": "node scripts/generate-metadata.js",
+    "catalog:test": "node scripts/test-catalog.js"
   }
 }

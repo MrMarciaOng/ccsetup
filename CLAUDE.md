@@ -118,7 +118,7 @@ Closes #XXX (if applicable)
 npm install
 
 # Run the setup script locally
-node bin/index.js <project-name>
+node bin/create-project.js <project-name>
 
 # Test the package locally
 npm link
@@ -130,9 +130,9 @@ npm publish
 
 ## Important Context
 - This is an npm package published as `ccsetup`
-- The main entry point is `bin/index.js` which creates the boilerplate structure
-- Templates are stored in the `templates/` directory and copied to new projects
-- The package creates a complete Claude Code project structure with agents, documentation, and workflow templates
+- The main entry point is `bin/create-project.js` which creates the boilerplate structure
+- Templates are stored in the `template/` directory and copied to new projects
+- The package ships 8 core agents (backend, blockchain, checker, coder, frontend, planner, researcher, shadcn)
 - Users can customize which agents to include by copying only needed ones to their project
 
 ## Agents
@@ -152,44 +152,8 @@ See @plans/README.md for planning documents and architectural decisions
 
 ## Important Instructions
 
-Before starting any task:
-1. **Follow Agent Orchestration**: Refer to @docs/agent-orchestration.md and follow the appropriate workflow for your task type
-2. **Confirm understanding**: Always confirm you understand the request and outline your plan before proceeding
-3. **Ask clarifying questions**: Never make assumptions - ask questions when requirements are unclear
-4. **Create planning documents**: Before implementing any code or features, create a markdown file documenting the approach
-5. **Use plans directory**: When discussing ideas or next steps, create timestamped files in the plans directory (e.g., `plans/next-steps-YYYY-MM-DD-HH-MM-SS.md`) to maintain a record of decisions
-6. **No code comments**: Never add comments to any code you write - code should be self-documenting
-7. **Sequential agent execution**: When using multiple agents, execute them in the order specified in the orchestration workflows
-
-## File Management Rules
-
-### CRITICAL: Working Directory Restrictions
-1. **ALWAYS** work exclusively within the project directory
-2. **NEVER** create or modify files outside the project root
-3. **NEVER** use absolute paths to external directories (e.g., /tmp, /var, /usr, ~/)
-4. **ALWAYS** use project-relative paths for all file operations
-
-### Test File Organization
-- Place test files in designated test directories:
-  - `__test__/` or `__tests__/` for JavaScript/TypeScript projects
-  - `test/` for general test files and fixtures
-  - `spec/` for specification-based tests
-  - Follow project-specific conventions if different
-- Mirror source code structure in test directories
-- Use appropriate naming conventions (*.test.js, *.spec.ts, test_*.py)
-
-### Example File Operations
-```bash
-# CORRECT - Project relative paths
-mkdir -p __test__/unit
-touch __test__/unit/component.test.js
-echo "data" > test/fixtures/sample.json
-
-# INCORRECT - External paths (NEVER DO THIS)
-# touch /tmp/test.js
-# mkdir ~/test-files
-# echo "data" > /var/tmp/output.txt
-```
-
-## Additional Notes
-[Any other important information for Claude to know about this project]
+- Follow agent orchestration workflows defined in @docs/agent-orchestration.md
+- Ask clarifying questions when requirements are unclear
+- Self-documenting code — no code comments
+- Work exclusively within the project directory; use project-relative paths
+- Place test files in `__test__/` directory

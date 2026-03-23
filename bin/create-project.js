@@ -3,9 +3,24 @@
 const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
+const RepositoryScanner = require('../lib/scanner');
+const ContextGenerator = require('../lib/contextGenerator');
+const ContextMerger = require('../lib/contextMerger');
+const ProgressReporter = require('../lib/progressReporter');
+const TemplateCatalog = require('../lib/templates/catalog');
+const TemplateFilter = require('../lib/templates/filter');
+const TemplateSearch = require('../lib/templates/search');
+const AIAgentSelector = require('../lib/aiAgentSelector');
 
 // Parse CLI arguments
 const args = process.argv.slice(2);
+
+// Handle scan subcommand
+if (args[0] === 'scan') {
+  require('./scan.js');
+  return;
+}
+
 const flags = {
   force: false,
   dryRun: false,
@@ -13,7 +28,11 @@ const flags = {
   allAgents: false,
   noAgents: false,
   agents: false,
-  browseAgents: false
+  browseAgents: false,
+  browse: false,
+  scanContext: false,
+  scanOnly: false,
+  prompt: null
 };
 
 let projectName = '.';
@@ -33,8 +52,19 @@ for (let i = 0; i < args.length; i++) {
     flags.noAgents = true;
   } else if (arg === '--agents') {
     flags.agents = true;
+  } else if (arg === '--ai-agents') {
+    flags.aiAgents = true;
+    flags.agents = true; // AI agents implies agent selection
   } else if (arg === '--browse-agents') {
     flags.browseAgents = true;
+  } else if (arg === '--browse') {
+    flags.browse = true;
+  } else if (arg === '--scan-context') {
+    flags.scanContext = true;
+  } else if (arg === '--scan-only') {
+    flags.scanOnly = true;
+  } else if (arg === '--install-hooks') {
+    flags.installHooks = true;
   } else if (!arg.startsWith('-')) {
     projectName = arg;
   }
@@ -44,24 +74,47 @@ for (let i = 0; i < args.length; i++) {
 if (flags.help) {
   console.log(`
 Usage: ccsetup [project-name] [options]
+       ccsetup scan [path] [options]
+
+Commands:
+  ccsetup              Interactive mode - choose full setup or scan-only
+  ccsetup <name>       Create a new Claude Code project
+  ccsetup scan         Advanced repository scanning (see 'ccsetup scan --help')
 
 Options:
-  --force, -f     Skip all prompts and overwrite existing files
-  --dry-run, -d   Show what would be done without making changes
-  --agents        Interactive agent selection mode
-  --all-agents    Include all agents without prompting
-  --no-agents     Skip agent selection entirely
-  --browse-agents Copy all agents to /agents folder for browsing
-  --help, -h      Show this help message
+  --scan-only          Skip project setup, only scan and create/update CLAUDE.md ⭐
+  --force, -f          Skip all prompts and overwrite existing files
+  --dry-run, -d        Show what would be done without making changes
+  --agents             Interactive agent selection mode
+  --ai-agents          AI-powered agent recommendations based on your project
+  --all-agents         Include all agents without prompting
+  --no-agents          Skip agent selection entirely
+  --browse-agents      Copy all agents to /agents folder for browsing
+  --browse             Enhanced template browsing and selection interface
+  --scan-context       Scan repository and add context to CLAUDE.md
+  --install-hooks      Install workflow selection hook to .claude/hooks
+  --help, -h           Show this help message
 
+Quick Start:
+  npx ccsetup              # Interactive mode - choose what to do
+  npx ccsetup --scan-only  # Just scan and create CLAUDE.md ⭐
+  npx ccsetup my-project   # Full project setup
+
+Scan-Only Mode ⭐:
+  Perfect for existing projects! Analyzes your codebase and creates/updates
+  CLAUDE.md with project context without modifying your project structure.
+  
 Examples:
-  ccsetup                      # Create in current directory
+  ccsetup --scan-only           # Scan current directory only
+  ccsetup . --scan-only         # Same as above
+  ccsetup --scan-only --force   # Skip confirmation prompts
+  ccsetup --scan-only --dry-run # Preview what would happen
+
+Full Setup Examples:
+  ccsetup                      # Interactive setup in current directory
   ccsetup my-project           # Create in new directory
-  ccsetup . --force            # Overwrite files in current directory
-  ccsetup my-app --dry-run     # Preview changes without creating files
-  ccsetup --agents             # Interactive agent selection only
+  ccsetup . --scan-context     # Full setup with context scanning
   ccsetup my-app --all-agents  # Include all agents automatically
-  ccsetup --browse-agents      # Copy all agents for manual selection
 `);
   process.exit(0);
 }
@@ -82,16 +135,220 @@ function validateProjectName(name) {
   return true;
 }
 
-// Validate conflicting flags
-if (flags.allAgents && flags.noAgents) {
-  console.error('Error: Cannot use --all-agents and --no-agents together');
-  process.exit(1);
+async function scanRepositoryForContext(projectPath) {
+  try {
+    const progressReporter = new ProgressReporter();
+    console.log('🔍 Scanning repository for project context...');
+    
+    const scanner = new RepositoryScanner(projectPath);
+    const scanResults = await scanner.scan(progressReporter);
+    
+    const contextGenerator = new ContextGenerator(scanResults);
+    const context = contextGenerator.generate();
+    const structuredSections = contextGenerator.generateStructuredSections();
+    
+    console.log('\n📊 Detected project details:');
+    if (context.overview) {
+      console.log(`   ${context.overview}`);
+    }
+    
+    if (context.techStack && context.techStack.frameworks && context.techStack.frameworks.length > 0) {
+      console.log(`   Framework: ${context.techStack.frameworks.join(', ')}`);
+    }
+    
+    if (context.commands && Object.keys(context.commands).length > 0) {
+      const totalCommands = Object.values(context.commands).reduce((sum, cmds) => sum + cmds.length, 0);
+      console.log(`   Commands: ${totalCommands} available scripts`);
+    }
+    
+    if (context.patterns && Object.keys(context.patterns).length > 0) {
+      const totalPatterns = Object.values(context.patterns).reduce((sum, patterns) => sum + patterns.length, 0);
+      console.log(`   Patterns: ${totalPatterns} detected architectural patterns`);
+    }
+    
+    return {
+      scanResults,
+      contextGenerator,
+      structuredSections,
+      formattedContext: contextGenerator.formatForClaude()
+    };
+  } catch (error) {
+    console.warn(`⚠️  Repository scanning failed: ${error.message}`);
+    console.log('   Continuing with standard setup...\n');
+    return null;
+  }
 }
 
-if (flags.browseAgents && (flags.allAgents || flags.noAgents || flags.agents)) {
-  console.error('Error: --browse-agents cannot be used with other agent flags');
-  process.exit(1);
+async function previewAndConfirmContext(formattedContext) {
+  console.log('\n📝 Generated context preview:');
+  console.log('━'.repeat(60));
+  console.log(formattedContext);
+  console.log('━'.repeat(60));
+  
+  // Use inquirer instead of readline prompt
+  const selectModule = await import('@inquirer/select');
+  const select = selectModule.default;
+  const response = await select({
+    message: 'Would you like to add this context to CLAUDE.md?',
+    choices: [
+      { name: 'Yes', value: 'y' },
+      { name: 'No', value: 'n' },
+      { name: 'Edit', value: 'edit' }
+    ],
+    default: 'y'
+  });
+  return response;
 }
+
+async function shouldScanRepository() {
+  console.log('\n🔍 Existing project files detected.');
+  // Use inquirer instead of readline prompt
+  const confirmModule = await import('@inquirer/confirm');
+  const confirm = confirmModule.default;
+  const response = await confirm({
+    message: 'Would you like to scan the repository to add project context to CLAUDE.md?',
+    default: true
+  });
+  return response;
+}
+
+async function mergeContextIntelligently(existingContent, repositoryContext, strategy = 'smart') {
+  try {
+    // Handle overwrite strategy
+    if (strategy === 'overwrite') {
+      console.log('   ♻️  Overwriting with new scan results...');
+      // Get template and apply context
+      const templatePath = path.join(__dirname, '..', 'template', 'CLAUDE.md');
+      let template = '';
+      if (fs.existsSync(templatePath)) {
+        template = fs.readFileSync(templatePath, 'utf8');
+      } else {
+        template = `# Claude Code Project Instructions
+
+## Project Overview
+[Project description will be added here]
+
+## Key Objectives
+[Project objectives will be added here]
+
+## Additional Notes
+[Any other important information for Claude to know about this project]
+`;
+      }
+      return await applyContextToTemplate(template, repositoryContext, 'append');
+    }
+    
+    // Use structured sections for intelligent merge, fall back to formatted context
+    let contextToMerge = repositoryContext.formattedContext;
+    
+    if (repositoryContext.structuredSections && 
+        typeof repositoryContext.structuredSections === 'object' && 
+        Object.keys(repositoryContext.structuredSections).length > 0) {
+      contextToMerge = repositoryContext.structuredSections;
+      console.log('   📊 Using intelligent merge with structured sections');
+    } else {
+      console.log('   📝 Using fallback merge with formatted content');
+    }
+    const merger = new ContextMerger(existingContent, contextToMerge);
+    const changes = merger.getChangesSummary();
+    
+    if (!changes.hasChanges) {
+      console.log('   ✅ Context is already up to date');
+      return existingContent;
+    }
+    
+    console.log('\n   📊 Merge Analysis:');
+    if (changes.added > 0) console.log(`     + ${changes.added} new sections`);
+    if (changes.modified > 0) console.log(`     ~ ${changes.modified} updated sections`);
+    if (changes.unchanged > 0) console.log(`     ✓ ${changes.unchanged} preserved sections`);
+    
+    const mergedContent = await merger.merge(strategy);
+    
+    if (typeof mergedContent === 'string') {
+      const existingHeader = merger.extractHeaderContent();
+      return existingHeader + '\n\n' + mergedContent;
+    }
+    
+    return mergedContent;
+  } catch (error) {
+    // Re-throw specific errors that should stop the process
+    if (error.message === 'Interactive merge cancelled' || 
+        error.message === 'Missing required dependency') {
+      throw error;
+    }
+    
+    console.warn(`   ⚠️  Merge failed: ${error.message}`);
+    console.log('   📝 Falling back to simple append...');
+    
+    // Fall back to formatted context for simple append
+    const newContext = repositoryContext.formattedContext;
+    const additionalNotesMarker = '## Additional Notes';
+    const additionalNotesIdx = existingContent.indexOf(additionalNotesMarker);
+    
+    if (additionalNotesIdx === -1) {
+      return existingContent.trimEnd() + '\n\n' + additionalNotesMarker + '\n\n' + newContext.trim() + '\n';
+    } else {
+      const insertIdx = existingContent.indexOf('\n', additionalNotesIdx) + 1;
+      return existingContent.substring(0, insertIdx) + '\n' + newContext.trim() + '\n' + existingContent.substring(insertIdx);
+    }
+  }
+}
+
+async function applyContextToTemplate(templateContent, repositoryContext, conflictStrategy) {
+  const contextContent = repositoryContext.formattedContext;
+  const additionalNotesMarker = '## Additional Notes';
+  const placeholderContent = '[Any other important information for Claude to know about this project]';
+  
+  if (templateContent.includes(additionalNotesMarker)) {
+    if (templateContent.includes(placeholderContent)) {
+      return templateContent.replace(placeholderContent, contextContent.trim());
+    } else {
+      const sections = templateContent.split(additionalNotesMarker);
+      if (sections.length >= 2) {
+        return sections[0] + additionalNotesMarker + contextContent + '\n';
+      }
+    }
+  }
+  
+  return templateContent + contextContent;
+}
+
+// Validate conflicting flags
+function validateFlags() {
+  // Scan-only conflicts
+  if (flags.scanOnly) {
+    const conflictingFlags = [];
+    if (flags.allAgents) conflictingFlags.push('--all-agents');
+    if (flags.noAgents) conflictingFlags.push('--no-agents');
+    if (flags.browseAgents) conflictingFlags.push('--browse-agents');
+    if (flags.browse) conflictingFlags.push('--browse');
+    if (flags.agents) conflictingFlags.push('--agents');
+    
+    if (conflictingFlags.length > 0) {
+      console.error(`Error: --scan-only cannot be used with ${conflictingFlags.join(', ')}`);
+      console.log('Tip: --scan-only skips all agent-related operations');
+      process.exit(1);
+    }
+  }
+  
+  // Existing validations
+  if (flags.allAgents && flags.noAgents) {
+    console.error('Error: Cannot use --all-agents and --no-agents together');
+    process.exit(1);
+  }
+
+  if (flags.browseAgents && (flags.allAgents || flags.noAgents || flags.agents || flags.browse)) {
+    console.error('Error: --browse-agents cannot be used with other agent flags');
+    process.exit(1);
+  }
+  
+  if (flags.browse && (flags.allAgents || flags.noAgents || flags.browseAgents)) {
+    console.error('Error: --browse cannot be used with other agent flags except --agents');
+    process.exit(1);
+  }
+}
+
+validateFlags();
 
 // Validate the project name
 if (projectName !== '.') {
@@ -451,6 +708,751 @@ function getAvailableAgents() {
   return agents.sort((a, b) => a.name.localeCompare(b.name));
 }
 
+// Install Claude Code hooks
+async function installClaudeHooks() {
+  console.log('\n🪝 Installing Claude Code Workflow Selection Hook...\n');
+  
+  const claudeDir = path.join(process.cwd(), '.claude');
+  const hooksDir = path.join(claudeDir, 'hooks');
+  const settingsFile = path.join(claudeDir, 'settings.json');
+  
+  // Check if .claude directory exists
+  if (!fs.existsSync(claudeDir)) {
+    console.error('❌ Error: .claude directory not found.');
+    console.log('\n💡 Please run "claude init" first to initialize Claude Code in this directory.\n');
+    return;
+  }
+  
+  try {
+    // Create hooks directory
+    if (!fs.existsSync(hooksDir)) {
+      fs.mkdirSync(hooksDir, { recursive: true });
+      console.log('✅ Created .claude/hooks directory');
+    }
+    
+    // Copy workflow-selector hook
+    const hookSourceDir = path.join(templateDir, 'hooks', 'workflow-selector');
+    const hookDestDir = path.join(hooksDir, 'workflow-selector');
+    
+    if (!fs.existsSync(hookSourceDir)) {
+      console.error('❌ Error: Hook source files not found in template.');
+      return;
+    }
+    
+    // Check if hook already exists
+    const hookFile = path.join(hookSourceDir, 'index.js');
+    const destFile = path.join(hookDestDir, 'index.js');
+    let shouldCopyHook = true;
+    
+    if (fs.existsSync(destFile)) {
+      console.log('⚠️  Workflow-selector hook already exists.');
+      const selectModule = await import('@inquirer/select');
+      const select = selectModule.default;
+      
+      const action = await select({
+        message: 'How would you like to proceed?',
+        choices: [
+          {
+            name: '📋 Keep existing - Preserve your customizations',
+            value: 'keep',
+            description: 'Keep your existing hook file unchanged'
+          },
+          {
+            name: '🔄 Update - Replace with latest version',
+            value: 'replace',
+            description: 'Replace with the latest hook (backup will be created)'
+          },
+          {
+            name: '👀 Compare - View differences first',
+            value: 'compare',
+            description: 'Compare existing and new versions before deciding'
+          },
+          {
+            name: '❌ Skip - Cancel hook installation',
+            value: 'skip',
+            description: 'Skip installing the hook file'
+          }
+        ]
+      });
+      
+      if (action === 'skip') {
+        console.log('⏭️  Skipped hook file installation');
+        shouldCopyHook = false;
+      } else if (action === 'keep') {
+        console.log('✅ Keeping existing hook file');
+        shouldCopyHook = false;
+      } else if (action === 'compare') {
+        // Show comparison
+        console.log('\n📄 Existing hook file summary:');
+        const existingContent = fs.readFileSync(destFile, 'utf8');
+        const existingLines = existingContent.split('\n').length;
+        console.log(`   Lines: ${existingLines}`);
+        console.log(`   Size: ${fs.statSync(destFile).size} bytes`);
+        console.log(`   Modified: ${fs.statSync(destFile).mtime.toLocaleString()}`);
+        
+        const confirmModule = await import('@inquirer/confirm');
+        const confirm = confirmModule.default;
+        const shouldReplace = await confirm({
+          message: 'Replace with new version?',
+          default: false
+        });
+        
+        if (shouldReplace) {
+          // Create backup
+          const backupFile = destFile + '.backup-' + Date.now();
+          fs.copyFileSync(destFile, backupFile);
+          console.log(`✅ Created backup: ${path.basename(backupFile)}`);
+          shouldCopyHook = true;
+        } else {
+          shouldCopyHook = false;
+        }
+      } else if (action === 'replace') {
+        // Create backup
+        const backupFile = destFile + '.backup-' + Date.now();
+        fs.copyFileSync(destFile, backupFile);
+        console.log(`✅ Created backup: ${path.basename(backupFile)}`);
+        shouldCopyHook = true;
+      }
+    }
+    
+    // Create workflow-selector directory if needed
+    if (!fs.existsSync(hookDestDir)) {
+      fs.mkdirSync(hookDestDir, { recursive: true });
+    }
+    
+    // Copy hook file if needed
+    if (shouldCopyHook) {
+      fs.copyFileSync(hookFile, destFile);
+      console.log('✅ Installed workflow-selector hook');
+    }
+    
+    // Update settings.json
+    let settings = {};
+    if (fs.existsSync(settingsFile)) {
+      const content = fs.readFileSync(settingsFile, 'utf8');
+      try {
+        settings = JSON.parse(content);
+      } catch (e) {
+        console.warn('⚠️  Warning: Could not parse existing settings.json, creating new one');
+      }
+    }
+    
+    // Add hook configuration intelligently
+    if (!settings.hooks) {
+      settings.hooks = {};
+    }
+    
+    // Check if UserPromptSubmit hooks already exist
+    const workflowHookCommand = "node $CLAUDE_PROJECT_DIR/.claude/hooks/workflow-selector/index.js";
+    let hookExists = false;
+    
+    if (settings.hooks.UserPromptSubmit && Array.isArray(settings.hooks.UserPromptSubmit)) {
+      // Check if our hook is already configured
+      hookExists = settings.hooks.UserPromptSubmit.some(hookConfig => 
+        hookConfig.hooks && hookConfig.hooks.some(hook => 
+          hook.type === 'command' && hook.command === workflowHookCommand
+        )
+      );
+      
+      if (hookExists) {
+        console.log('✅ Workflow hook already configured in settings.json');
+      } else {
+        // Ask user how to proceed
+        const selectModule = await import('@inquirer/select');
+        const select = selectModule.default;
+        
+        console.log('\n⚠️  Existing UserPromptSubmit hooks detected in settings.json');
+        const action = await select({
+          message: 'How would you like to add the workflow hook?',
+          choices: [
+            {
+              name: '➕ Add to existing - Preserve current hooks and add workflow hook',
+              value: 'add',
+              description: 'Keep all existing hooks and add the workflow hook'
+            },
+            {
+              name: '🔄 Replace all - Replace existing hooks with workflow hook',
+              value: 'replace',
+              description: 'Replace all existing hooks (backup will be created)'
+            },
+            {
+              name: '❌ Skip - Don\'t modify hooks configuration',
+              value: 'skip',
+              description: 'Keep settings.json unchanged'
+            }
+          ]
+        });
+        
+        if (action === 'add') {
+          // Add our hook to existing array
+          settings.hooks.UserPromptSubmit.push({
+            "matcher": ".*",
+            "hooks": [
+              {
+                "type": "command",
+                "command": workflowHookCommand
+              }
+            ]
+          });
+          console.log('✅ Added workflow hook to existing hooks');
+        } else if (action === 'replace') {
+          // Backup existing settings
+          const backupFile = settingsFile + '.backup-' + Date.now();
+          fs.writeFileSync(backupFile, JSON.stringify(settings, null, 2));
+          console.log(`✅ Created settings backup: ${path.basename(backupFile)}`);
+          
+          // Replace with our hook
+          settings.hooks.UserPromptSubmit = [
+            {
+              "matcher": ".*",
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": workflowHookCommand
+                }
+              ]
+            }
+          ];
+          console.log('✅ Replaced existing hooks with workflow hook');
+        } else {
+          console.log('⏭️  Skipped settings.json modification');
+          return;
+        }
+      }
+    } else {
+      // No existing UserPromptSubmit hooks, safe to add
+      settings.hooks.UserPromptSubmit = [
+        {
+          "matcher": ".*",
+          "hooks": [
+            {
+              "type": "command",
+              "command": workflowHookCommand
+            }
+          ]
+        }
+      ];
+      console.log('✅ Added workflow hook configuration');
+    }
+    
+    // Write updated settings only if we made changes
+    if (!hookExists) {
+      fs.writeFileSync(settingsFile, JSON.stringify(settings, null, 2));
+      console.log('✅ Updated .claude/settings.json');
+    }
+    
+    // Copy agent-orchestration.md if it doesn't exist
+    const orchestrationSource = path.join(templateDir, 'docs', 'agent-orchestration.md');
+    const orchestrationDest = path.join(process.cwd(), 'docs', 'agent-orchestration.md');
+    
+    if (!fs.existsSync(orchestrationDest) && fs.existsSync(orchestrationSource)) {
+      const docsDir = path.join(process.cwd(), 'docs');
+      if (!fs.existsSync(docsDir)) {
+        fs.mkdirSync(docsDir, { recursive: true });
+      }
+      fs.copyFileSync(orchestrationSource, orchestrationDest);
+      console.log('✅ Copied agent-orchestration.md to docs/');
+    }
+    
+    console.log('\n🎉 Workflow selection hook installed successfully!\n');
+    console.log('The hook will:');
+    console.log('  • Analyze your prompts to determine task type');
+    console.log('  • Suggest appropriate workflows (Feature Development, Bug Fix, etc.)');
+    console.log('  • Generate relevant todo items');
+    console.log('  • Guide agent selection based on the task\n');
+    console.log('📝 Note: The hook reads workflows from docs/agent-orchestration.md');
+    console.log('💡 You can disable the hook by editing .claude/settings.json\n');
+    
+  } catch (error) {
+    console.error('❌ Error installing hooks:', error.message);
+  }
+}
+
+// Setup mode selection function
+async function selectSetupMode() {
+  // Direct flag handling
+  if (flags.installHooks) return 'install-hooks';
+  if (flags.scanOnly) return 'scan-only';
+  if (flags.agents) return 'agents-only';
+  if (flags.force || flags.browseAgents || flags.allAgents || flags.noAgents) return 'full';
+  
+  // Skip selection if already in a specific mode
+  if (projectName !== '.' || flags.scanContext) return 'full';
+  
+  // Interactive selection for bare 'npx ccsetup'
+  console.log('Welcome to ccsetup! 🎉\n');
+  console.log('This tool helps you set up and maintain your Claude Code project.');
+  console.log('Let\'s analyze your repository and create the perfect CLAUDE.md file.\n');
+  
+  // Check if CLAUDE.md exists to provide context
+  const claudeMdExists = fs.existsSync(path.join(process.cwd(), 'CLAUDE.md'));
+  if (claudeMdExists) {
+    console.log('📋 Existing CLAUDE.md detected in this directory.\n');
+  } else {
+    console.log('📄 No CLAUDE.md found. Let\'s create one!\n');
+  }
+  
+  // Dynamic import for ESM module
+  const selectModule = await import('@inquirer/select');
+  const select = selectModule.default;
+  
+  const mode = await select({
+    message: claudeMdExists ? 
+      'CLAUDE.md exists. How would you like to proceed?' : 
+      'What would you like to do?',
+    choices: claudeMdExists ? [
+      {
+        name: '🔄 Update CLAUDE.md - Keep my content, add new findings',
+        value: 'scan-smart',
+        description: 'Preserves your customizations while adding newly detected information'
+      },
+      {
+        name: '👀 Review Changes - See and approve each update',
+        value: 'scan-interactive',
+        description: 'Shows you each change before applying it to your CLAUDE.md'
+      },
+      {
+        name: '🆕 Fresh Start - Replace with new scan',
+        value: 'scan-only',
+        description: 'Creates a brand new CLAUDE.md from your current codebase'
+      },
+      {
+        name: '🏗️  Full Setup - Add agents and project structure',
+        value: 'full',
+        description: 'Creates the complete Claude Code boilerplate structure with workflow hooks'
+      },
+      {
+        name: '🪝  Install Hooks - Add workflow selection hook to .claude',
+        value: 'install-hooks',
+        description: 'Installs pre-hook for automatic workflow selection in Claude Code'
+      }
+    ] : [
+      {
+        name: '🚀 Quick Start - Just create CLAUDE.md',
+        value: 'scan-smart',
+        description: 'Scans your code and creates CLAUDE.md with project context'
+      },
+      {
+        name: '🏗️  Full Setup - Complete Claude Code structure',
+        value: 'full',
+        description: 'Creates CLAUDE.md plus agents, docs, tickets, plans, and workflow hooks'
+      },
+      {
+        name: '🪝  Install Hooks - Add workflow selection hook',
+        value: 'install-hooks',
+        description: 'Installs pre-hook for automatic workflow selection in Claude Code'
+      }
+    ]
+  });
+  
+  return mode;
+}
+
+// Validate scan-only environment
+async function validateScanOnlyEnvironment() {
+  // Check directory exists and is accessible
+  try {
+    await fs.promises.access(targetDir, fs.constants.R_OK | fs.constants.W_OK);
+  } catch (error) {
+    let message = 'Cannot access target directory';
+    let suggestion = 'Check directory permissions';
+    
+    if (error.code === 'ENOENT') {
+      message = 'Target directory does not exist';
+      suggestion = 'Create the directory first or check the path';
+    } else if (error.code === 'EACCES') {
+      message = 'Permission denied accessing target directory';
+      suggestion = 'Run with appropriate permissions or use sudo';
+    } else if (error.code === 'ENOTDIR') {
+      message = 'Target path is not a directory';
+      suggestion = 'Specify a valid directory path';
+    }
+    
+    return {
+      valid: false,
+      message,
+      suggestion
+    };
+  }
+  
+  // Check if CLAUDE.md exists and is writable
+  const claudeMdPath = path.join(targetDir, 'CLAUDE.md');
+  if (fs.existsSync(claudeMdPath)) {
+    try {
+      await fs.promises.access(claudeMdPath, fs.constants.R_OK | fs.constants.W_OK);
+    } catch (error) {
+      return {
+        valid: false,
+        message: 'Cannot access existing CLAUDE.md file',
+        suggestion: 'Check file permissions or run with appropriate access rights'
+      };
+    }
+  }
+  
+  // Check if directory is empty (warning only)
+  const files = await fs.promises.readdir(targetDir);
+  const hasFiles = files.some(f => !f.startsWith('.') && f !== 'node_modules');
+  
+  if (!hasFiles && projectName === '.') {
+    console.log('⚠️  Warning: Current directory appears to be empty.');
+    console.log('   Scan results may be limited.\n');
+  }
+  
+  return { valid: true };
+}
+
+// Get CLAUDE.md template
+async function getClaudeMdTemplate() {
+  const templatePath = path.join(__dirname, '..', 'template', 'CLAUDE.md');
+  try {
+    return await fs.promises.readFile(templatePath, 'utf8');
+  } catch (error) {
+    // Fallback to minimal template
+    return `# Claude Code Project Instructions
+
+## Project Overview
+[Project description will be added here]
+
+## Key Objectives
+[Project objectives will be added here]
+
+## Additional Notes
+[Any other important information for Claude to know about this project]
+`;
+  }
+}
+
+// Scan-only mode implementation
+async function scanOnlyMode(defaultMergeStrategy = 'smart') {
+  console.log('\n🔍 Repository Scan Mode\n');
+  
+  // Provide context based on merge strategy
+  switch (defaultMergeStrategy) {
+    case 'interactive':
+      console.log('📋 Interactive Review Mode');
+      console.log('You\'ll review each change before it\'s applied to CLAUDE.md');
+      console.log('Perfect for: Careful updates when you have custom content to preserve\n');
+      break;
+    case 'smart':
+      console.log('🧠 Smart Update Mode');
+      console.log('Intelligently merges new findings with your existing CLAUDE.md');
+      console.log('Perfect for: Regular updates that preserve your customizations\n');
+      break;
+    case 'overwrite':
+      console.log('♻️  Fresh Scan Mode');
+      console.log('Creates a brand new CLAUDE.md from your current codebase');
+      console.log('Perfect for: Starting fresh or major project restructuring\n');
+      break;
+  }
+  
+  console.log('This will analyze your repository and update CLAUDE.md with:');
+  console.log('  • Project structure and organization');
+  console.log('  • Technology stack and dependencies');
+  console.log('  • Available commands and scripts');
+  console.log('  • Architectural patterns detected');
+  console.log('  • Important context for Claude\n');
+  
+  // Validate environment
+  const validation = await validateScanOnlyEnvironment();
+  if (!validation.valid) {
+    console.error(`❌ ${validation.message}`);
+    if (validation.suggestion) {
+      console.log(`💡 ${validation.suggestion}`);
+    }
+    return;
+  }
+  
+  // Confirmation prompt (unless --force)
+  if (!flags.force && !flags.dryRun) {
+    // Create readline interface if needed
+    if (!rl) {
+      rl = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout
+      });
+    }
+    
+    // Use inquirer instead of readline prompt
+    const confirmModule = await import('@inquirer/confirm');
+    const confirm = confirmModule.default;
+    const shouldContinue = await confirm({
+      message: 'Continue?',
+      default: true
+    });
+    if (!shouldContinue) {
+      console.log('Setup cancelled.');
+      if (rl) rl.close();
+      return;
+    }
+  }
+  
+  // Check if directory has meaningful files
+  const files = await fs.promises.readdir(targetDir);
+  const hasFiles = files.some(f => !f.startsWith('.') && f !== 'node_modules');
+  
+  // Perform repository scan
+  let repositoryContext = null;
+  try {
+    repositoryContext = await scanRepositoryForContext(targetDir);
+  } catch (error) {
+    console.error('❌ Repository scanning failed:', error.message);
+    if (rl) rl.close();
+    return;
+  }
+  
+  if (!repositoryContext) {
+    // Handle empty directory case
+    if (!hasFiles && projectName === '.') {
+      console.log('📝 Since the directory is empty, would you like to:');
+      console.log('1) Create a minimal CLAUDE.md with basic template');
+      console.log('2) Cancel and run full setup instead');
+      
+      // Use inquirer instead of readline prompt
+      const selectModule = await import('@inquirer/select');
+      const select = selectModule.default;
+      const choice = await select({
+        message: 'Choose an option:',
+        choices: [
+          { name: '1) Continue with minimal context', value: '1' },
+          { name: '2) Cancel and run full setup instead', value: '2' }
+        ]
+      });
+      
+      if (choice === '2') {
+        console.log('\n💡 Run `npx ccsetup` without --scan-only for full project setup.');
+        if (rl) rl.close();
+        return;
+      }
+      
+      // Continue with minimal context
+      repositoryContext = {
+        formattedContext: `
+## Additional Notes
+
+This project directory was empty when scanned. 
+Please update this file with relevant project information as you develop.
+
+### Getting Started
+- Add project description above
+- Define key objectives
+- Document important conventions
+- Update as the project evolves
+`
+      };
+    } else {
+      console.log('❌ Unable to generate context from repository.');
+      console.log('💡 Tip: Make sure you\'re in a valid project directory.');
+      if (rl) rl.close();
+      return;
+    }
+  }
+  
+  // Preview and confirm context
+  if (!flags.force && !flags.dryRun) {
+    const confirmResult = await previewAndConfirmContext(repositoryContext.formattedContext);
+    if (confirmResult === 'n' || confirmResult === 'no') {
+      console.log('✅ Setup cancelled.');
+      if (rl) rl.close();
+      return;
+    }
+  }
+  
+  // Handle CLAUDE.md creation/update
+  const claudeMdPath = path.join(targetDir, 'CLAUDE.md');
+  const exists = fs.existsSync(claudeMdPath);
+  let backupPath = null;
+  let mergeStrategy = 'smart'; // Default merge strategy
+  
+  try {
+    if (exists) {
+      // Update existing CLAUDE.md
+      if (!flags.force && !flags.dryRun) {
+        console.log('\n📋 Existing CLAUDE.md detected!');
+        
+        // Get AI suggestion for merge strategy if available
+        const existingContent = fs.readFileSync(claudeMdPath, 'utf8');
+        const merger = new ContextMerger(existingContent, repositoryContext);
+        const aiSuggestedStrategy = await merger.aiHelper.analyzeMergeStrategy(
+          existingContent, 
+          repositoryContext.formattedContext
+        );
+        
+        if (aiSuggestedStrategy) {
+          const strategyDescriptions = {
+            'smart': '🧠 Smart Merge - Intelligently combine sections',
+            'interactive': '👀 Interactive - Review each change',
+            'overwrite': '🔄 Fresh Scan - Replace with new content',
+            'preserve': '🛡️ Preserve - Keep existing content'
+          };
+          console.log(`🤖 AI Recommendation: ${strategyDescriptions[aiSuggestedStrategy] || aiSuggestedStrategy}`);
+          console.log('');
+        }
+        
+        // Use the default merge strategy if provided
+        if (defaultMergeStrategy === 'interactive') {
+          console.log('Using interactive merge mode - you\'ll review each change.');
+          mergeStrategy = 'interactive';
+        } else if (defaultMergeStrategy === 'overwrite') {
+          console.log('⚠️  This will replace your existing CLAUDE.md with a fresh scan.');
+          console.log('   Your current content will be backed up first.');
+          // Use inquirer instead of readline prompt
+          const confirmModule = await import('@inquirer/confirm');
+          const confirm = confirmModule.default;
+          const shouldProceed = await confirm({
+            message: 'Proceed with fresh scan?',
+            default: false
+          });
+          if (!shouldProceed) {
+            console.log('✅ Cancelled.');
+            if (rl) rl.close();
+            return;
+          }
+          mergeStrategy = 'overwrite';
+        } else {
+          console.log('The scan will:');
+          console.log('  • Preserve all your existing content');
+          console.log('  • Update the Additional Notes section with new findings');
+          console.log('  • Create an automatic backup');
+          
+          // Use inquirer instead of readline prompt
+          const confirmModule = await import('@inquirer/confirm');
+          const confirm = confirmModule.default;
+          const shouldContinue = await confirm({
+            message: 'Continue with smart update?',
+            default: true
+          });
+          if (!shouldContinue) {
+            console.log('✅ Update cancelled.');
+            if (rl) rl.close();
+            return;
+          }
+          mergeStrategy = defaultMergeStrategy;
+        }
+      } else {
+        mergeStrategy = defaultMergeStrategy;
+      }
+      
+      console.log('\n📄 Updating existing CLAUDE.md...');
+      
+      if (!flags.dryRun) {
+        // Check file size before processing
+        const stats = fs.statSync(claudeMdPath);
+        if (stats.size > 1024 * 1024) { // 1MB
+          console.warn('⚠️  Warning: CLAUDE.md is large (>1MB). Processing may take longer.');
+        }
+        
+        let existingContent;
+        try {
+          existingContent = fs.readFileSync(claudeMdPath, 'utf8');
+        } catch (error) {
+          throw new Error(`Failed to read existing CLAUDE.md: ${error.message}`);
+        }
+        
+        // Validate content
+        if (!existingContent) {
+          console.warn('⚠️  Warning: Existing CLAUDE.md appears to be empty.');
+        }
+        
+        // Create backup first
+        backupPath = `${claudeMdPath}.backup.${Date.now()}`;
+        try {
+          fs.writeFileSync(backupPath, existingContent);
+          console.log(`📦 Backup created: ${path.basename(backupPath)}`);
+        } catch (error) {
+          throw new Error(`Failed to create backup: ${error.message}`);
+        }
+        
+        // Use intelligent merge with backup
+        let updatedContent;
+        try {
+          updatedContent = await mergeContextIntelligently(existingContent, repositoryContext, mergeStrategy);
+        } catch (mergeError) {
+          if (mergeError.message === 'Interactive merge cancelled') {
+            console.log('💾 Your original CLAUDE.md is unchanged.');
+            console.log(`📦 Scan results backup: ${path.basename(backupPath)}`);
+            if (rl) rl.close();
+            return;
+          } else if (mergeError.message === 'Missing required dependency') {
+            console.error('Please install missing dependencies and try again.');
+            if (rl) rl.close();
+            return;
+          }
+          throw mergeError;
+        }
+        
+        try {
+          fs.writeFileSync(claudeMdPath, updatedContent, 'utf8');
+        } catch (error) {
+          // Restore from backup if write fails
+          try {
+            fs.writeFileSync(claudeMdPath, existingContent, 'utf8');
+            console.error('❌ Failed to update CLAUDE.md. Original content restored.');
+          } catch (restoreError) {
+            console.error('❌ Critical: Failed to update AND restore CLAUDE.md!');
+            console.error(`💾 Your content is safe in: ${path.basename(backupPath)}`);
+          }
+          throw new Error(`Failed to write updated content: ${error.message}`);
+        }
+        
+        console.log('✅ CLAUDE.md updated successfully!\n');
+        
+        // Provide feedback based on merge strategy used
+        if (mergeStrategy === 'interactive') {
+          console.log('   📋 Interactive merge completed');
+          console.log('   ✓ Your selections have been applied');
+        } else if (mergeStrategy === 'smart') {
+          console.log('   🧠 Smart merge completed');
+          console.log('   ✓ Your customizations preserved');
+          console.log('   ✓ New findings integrated');
+        } else if (mergeStrategy === 'overwrite') {
+          console.log('   ♻️  Fresh scan completed');
+          console.log('   ✓ New CLAUDE.md generated from current codebase');
+        }
+        
+        console.log(`   📦 Backup saved: ${path.basename(backupPath)}`);
+        console.log('   💡 Review the updated content and delete backup when satisfied');
+      } else {
+        console.log('  Would update: CLAUDE.md (dry-run mode)');
+      }
+    } else {
+      // Create new CLAUDE.md
+      console.log('\n📄 Creating CLAUDE.md...');
+      
+      if (!flags.dryRun) {
+        const template = await getClaudeMdTemplate();
+        const enhanced = await applyContextToTemplate(template, repositoryContext, 'append');
+        fs.writeFileSync(claudeMdPath, enhanced, 'utf8');
+        console.log('✅ CLAUDE.md created with project context!');
+      } else {
+        console.log('  Would create: CLAUDE.md (dry-run mode)');
+      }
+    }
+    
+    // Show next steps
+    console.log('\nNext steps:');
+    console.log('1. Review the updated Additional Notes section in CLAUDE.md');
+    console.log('2. Move any important context to appropriate sections');
+    if (exists && backupPath && !flags.dryRun) {
+      console.log(`3. Delete the backup file once satisfied: ${path.basename(backupPath)}`);
+      console.log('4. Run `ccsetup scan` anytime to refresh context');
+    } else if (exists) {
+      console.log('3. Run `ccsetup scan` anytime to refresh context');
+    } else {
+      console.log('3. Add project-specific instructions and guidelines');
+      console.log('4. Run `npx ccsetup` for full setup if you need agents and project structure');
+      console.log('5. Run `ccsetup scan` anytime to refresh context');
+    }
+    
+  } catch (error) {
+    console.error('❌ Error handling CLAUDE.md:', error.message);
+    if (exists && !flags.dryRun) {
+      console.log('💡 Your original CLAUDE.md is safe. Check for backup files if needed.');
+    }
+  } finally {
+    if (rl) rl.close();
+  }
+}
+
 // Dynamic import for ESM module
 async function importCheckbox() {
   try {
@@ -512,6 +1514,341 @@ async function selectAgents(availableAgents) {
   return validatedFiles;
 }
 
+async function enhancedAgentSelection() {
+  try {
+    console.log('\n🔍 Loading template catalog...');
+    const catalog = TemplateCatalog.createInstance();
+    const templates = await catalog.load();
+    
+    if (!templates.agents || templates.agents.length === 0) {
+      console.log('❌ No agents found in catalog. Falling back to basic selection.');
+      return await selectAgents(getAvailableAgents());
+    }
+    
+    console.log(`✅ Found ${templates.agents.length} agents in catalog\n`);
+    
+    // Import select for mode selection
+    const selectModule = await import('@inquirer/select');
+    const select = selectModule.default;
+    
+    const mode = await select({
+      message: 'How would you like to browse and select agents?',
+      choices: [
+        {
+          name: '🔍 Search & Filter - Find agents by keywords and categories',
+          value: 'search',
+          description: 'Use search and filtering to find exactly what you need'
+        },
+        {
+          name: '📂 Browse by Category - Explore agents organized by type',
+          value: 'category',
+          description: 'Browse agents grouped by their specialization'
+        },
+        {
+          name: '🏷️  Browse by Tags - Find agents with specific capabilities',
+          value: 'tags',
+          description: 'Explore agents based on their tags and features'
+        },
+        {
+          name: '📋 Simple List - Traditional selection from all agents',
+          value: 'simple',
+          description: 'Classic checkbox selection from complete agent list'
+        }
+      ]
+    });
+    
+    let selectedAgents = [];
+    
+    switch (mode) {
+      case 'search':
+        selectedAgents = await searchAndFilterSelection(templates.agents);
+        break;
+      case 'category':
+        selectedAgents = await categoryBrowseSelection(templates.agents);
+        break;
+      case 'tags':
+        selectedAgents = await tagBrowseSelection(templates.agents);
+        break;
+      case 'simple':
+      default:
+        selectedAgents = await simpleListSelection(templates.agents);
+        break;
+    }
+    
+    return selectedAgents.map(agent => agent.files[0]).filter(file => file && validateAgentFile(file));
+    
+  } catch (error) {
+    console.warn(`⚠️  Enhanced selection failed: ${error.message}`);
+    console.log('Falling back to basic agent selection...\n');
+    return await selectAgents(getAvailableAgents());
+  }
+}
+
+async function searchAndFilterSelection(agents) {
+  const inputModule = await import('@inquirer/input');
+  const input = inputModule.default;
+  const selectModule = await import('@inquirer/select');
+  const select = selectModule.default;
+  const checkboxModule = await import('@inquirer/checkbox');
+  const checkbox = checkboxModule.default;
+  
+  console.log('\n🔍 Search & Filter Mode\n');
+  
+  let currentResults = agents;
+  const selectedAgents = [];
+  
+  while (true) {
+    console.log(`\n📊 Current results: ${currentResults.length} agents`);
+    
+    const action = await select({
+      message: 'What would you like to do?',
+      choices: [
+        { name: '🔍 Search by keyword', value: 'search' },
+        { name: '📂 Filter by category', value: 'category' },
+        { name: '🏷️  Filter by tags', value: 'tags' },
+        { name: '📋 Select from current results', value: 'select' },
+        { name: '🔄 Reset filters', value: 'reset' },
+        { name: '✅ Finish selection', value: 'done' }
+      ]
+    });
+    
+    if (action === 'done') break;
+    
+    if (action === 'reset') {
+      currentResults = agents;
+      continue;
+    }
+    
+    if (action === 'search') {
+      const query = await input({
+        message: 'Enter search terms:',
+        validate: (input) => input.trim().length > 0 ? true : 'Please enter a search term'
+      });
+      
+      const search = new TemplateSearch(currentResults);
+      currentResults = search.search(query.trim()).getResults();
+      console.log(`Found ${currentResults.length} agents matching "${query}"`);
+      continue;
+    }
+    
+    if (action === 'category') {
+      const filter = new TemplateFilter(currentResults);
+      const categories = filter.getSubcategories();
+      
+      if (categories.length === 0) {
+        console.log('No categories available in current results.');
+        continue;
+      }
+      
+      const category = await select({
+        message: 'Select category:',
+        choices: [
+          { name: 'All categories', value: 'all' },
+          ...categories.map(cat => ({ name: cat, value: cat }))
+        ]
+      });
+      
+      currentResults = filter.byCategory(category).getResults();
+      console.log(`Filtered to ${currentResults.length} agents in category "${category}"`);
+      continue;
+    }
+    
+    if (action === 'tags') {
+      const filter = new TemplateFilter(currentResults);
+      const tagCloud = filter.getTagsByFrequency();
+      
+      if (tagCloud.length === 0) {
+        console.log('No tags available in current results.');
+        continue;
+      }
+      
+      const tags = await checkbox({
+        message: 'Select tags to filter by:',
+        choices: tagCloud.slice(0, 15).map(({ tag, count }) => ({
+          name: `${tag} (${count})`,
+          value: tag
+        })),
+        pageSize: 10
+      });
+      
+      if (tags.length > 0) {
+        currentResults = filter.byTags(tags).getResults();
+        console.log(`Filtered to ${currentResults.length} agents with tags: ${tags.join(', ')}`);
+      }
+      continue;
+    }
+    
+    if (action === 'select') {
+      if (currentResults.length === 0) {
+        console.log('No agents in current results to select from.');
+        continue;
+      }
+      
+      const choices = currentResults.map(agent => ({
+        name: `${agent.name}\n     ${agent.description}`,
+        value: agent,
+        checked: selectedAgents.some(selected => selected.id === agent.id)
+      }));
+      
+      const newSelections = await checkbox({
+        message: `Select agents (${currentResults.length} available):`,
+        choices,
+        pageSize: 8
+      });
+      
+      // Update selected agents
+      selectedAgents.length = 0;
+      selectedAgents.push(...newSelections);
+      
+      console.log(`Selected ${selectedAgents.length} agents`);
+    }
+  }
+  
+  return selectedAgents;
+}
+
+async function categoryBrowseSelection(agents) {
+  const selectModule = await import('@inquirer/select');
+  const select = selectModule.default;
+  const checkboxModule = await import('@inquirer/checkbox');
+  const checkbox = checkboxModule.default;
+  
+  console.log('\n📂 Category Browse Mode\n');
+  
+  const filter = new TemplateFilter(agents);
+  const categoryCatalog = {};
+  
+  // Group agents by subcategory
+  agents.forEach(agent => {
+    if (!categoryCatalog[agent.subcategory]) {
+      categoryCatalog[agent.subcategory] = [];
+    }
+    categoryCatalog[agent.subcategory].push(agent);
+  });
+  
+  const categories = Object.keys(categoryCatalog).sort();
+  
+  if (categories.length === 0) {
+    console.log('No categories found. Using simple selection.');
+    return await simpleListSelection(agents);
+  }
+  
+  console.log(`Found ${categories.length} categories:`);
+  categories.forEach(cat => {
+    console.log(`  📂 ${cat} (${categoryCatalog[cat].length} agents)`);
+  });
+  
+  const selectedAgents = [];
+  
+  while (true) {
+    const action = await select({
+      message: `Select a category to browse (${selectedAgents.length} agents selected):`,
+      choices: [
+        ...categories.map(cat => ({
+          name: `📂 ${cat} (${categoryCatalog[cat].length} agents)`,
+          value: cat
+        })),
+        { name: '✅ Finish selection', value: 'done' }
+      ]
+    });
+    
+    if (action === 'done') break;
+    
+    const categoryAgents = categoryCatalog[action];
+    const choices = categoryAgents.map(agent => ({
+      name: `${agent.name}\n     ${agent.description}`,
+      value: agent,
+      checked: selectedAgents.some(selected => selected.id === agent.id)
+    }));
+    
+    const selections = await checkbox({
+      message: `Select agents from ${action}:`,
+      choices,
+      pageSize: 8
+    });
+    
+    // Update selected agents for this category
+    selectedAgents = selectedAgents.filter(agent => agent.subcategory !== action);
+    selectedAgents.push(...selections);
+    
+    console.log(`Updated selection: ${selectedAgents.length} total agents selected`);
+  }
+  
+  return selectedAgents;
+}
+
+async function tagBrowseSelection(agents) {
+  const selectModule = await import('@inquirer/select');
+  const select = selectModule.default;
+  const checkboxModule = await import('@inquirer/checkbox');
+  const checkbox = checkboxModule.default;
+  
+  console.log('\n🏷️  Tag Browse Mode\n');
+  
+  const filter = new TemplateFilter(agents);
+  const tagCloud = filter.getTagsByFrequency();
+  
+  if (tagCloud.length === 0) {
+    console.log('No tags found. Using simple selection.');
+    return await simpleListSelection(agents);
+  }
+  
+  console.log(`Found ${tagCloud.length} tags. Most popular:`);
+  tagCloud.slice(0, 10).forEach(({ tag, count }) => {
+    console.log(`  🏷️  ${tag} (${count} agents)`);
+  });
+  
+  const selectedTags = await checkbox({
+    message: 'Select tags to filter agents:',
+    choices: tagCloud.map(({ tag, count }) => ({
+      name: `${tag} (${count} agents)`,
+      value: tag
+    })),
+    pageSize: 12
+  });
+  
+  if (selectedTags.length === 0) {
+    console.log('No tags selected. Using all agents.');
+    return await simpleListSelection(agents);
+  }
+  
+  const filteredAgents = filter.byTags(selectedTags).getResults();
+  console.log(`\nFiltered to ${filteredAgents.length} agents with selected tags`);
+  
+  if (filteredAgents.length === 0) {
+    console.log('No agents match the selected tags.');
+    return [];
+  }
+  
+  return await simpleListSelection(filteredAgents);
+}
+
+async function simpleListSelection(agents) {
+  const checkboxModule = await import('@inquirer/checkbox');
+  const checkbox = checkboxModule.default;
+  
+  console.log('\n📋 Simple List Selection\n');
+  
+  if (agents.length === 0) {
+    console.log('No agents available for selection.');
+    return [];
+  }
+  
+  const choices = agents.map(agent => ({
+    name: `${agent.name}\n     ${agent.description}`,
+    value: agent,
+    checked: false
+  }));
+  
+  const selectedAgents = await checkbox({
+    message: `Select agents (${agents.length} available):`,
+    choices,
+    pageSize: 10
+  });
+  
+  return selectedAgents;
+}
+
 async function main() {
   try {
     // Ensure template directory exists
@@ -519,18 +1856,59 @@ async function main() {
       throw new Error(`Template directory not found: ${templateDir}`);
     }
 
-    // Handle --agents flag for agent selection only
-    if (flags.agents) {
-      console.log('🤖 Interactive Agent Selection\n');
-      const availableAgents = getAvailableAgents();
-      
-      if (availableAgents.length === 0) {
-        console.log('No agents available for selection.');
-        process.exit(0);
+
+    // Add mode selection early (before agent selection)
+    const setupMode = await selectSetupMode();
+    
+    if (setupMode === 'install-hooks') {
+      // Install Claude Code hooks
+      await installClaudeHooks();
+      return;
+    }
+    
+    if (setupMode === 'scan-only' || setupMode === 'scan-smart' || setupMode === 'scan-interactive') {
+      // Close readline if open
+      if (rl) {
+        rl.close();
+        rl = null;
       }
       
-      // Perform interactive selection
-      const selectedAgentFiles = await selectAgents(availableAgents);
+      // Set appropriate flags based on mode
+      if (setupMode === 'scan-smart') {
+        flags.scanOnly = true;
+        flags.mergeStrategy = 'smart';
+      } else if (setupMode === 'scan-interactive') {
+        flags.scanOnly = true;
+        flags.mergeStrategy = 'interactive';
+      } else {
+        flags.scanOnly = true;
+        flags.mergeStrategy = 'overwrite';
+      }
+      
+      await scanOnlyMode(flags.mergeStrategy);
+      return;
+    }
+
+    // Handle --agents and --browse flags for agent selection only
+    if (flags.agents || flags.browse) {
+      console.log('🤖 Interactive Agent Selection\n');
+      
+      let selectedAgentFiles = [];
+      
+      if (flags.browse) {
+        // Use enhanced selection interface
+        selectedAgentFiles = await enhancedAgentSelection();
+      } else {
+        // Use traditional selection
+        const availableAgents = getAvailableAgents();
+        
+        if (availableAgents.length === 0) {
+          console.log('No agents available for selection.');
+          process.exit(0);
+        }
+        
+        selectedAgentFiles = await selectAgents(availableAgents);
+      }
       
       if (selectedAgentFiles.length === 0) {
         console.log('\n❌ No agents selected.');
@@ -548,13 +1926,20 @@ async function main() {
         console.log(`\n${colors.green}${colors.bold}✅ You selected ${selectedAgentFiles.length} agent${selectedAgentFiles.length === 1 ? '' : 's'}:${colors.reset}\n`);
         
         // Show selected agents with descriptions
-        selectedAgentFiles.forEach(file => {
-          const agent = availableAgents.find(a => a.file === file);
-          if (agent) {
-            console.log(`  ${colors.cyan}${colors.bold}${agent.name}${colors.reset}`);
-            console.log(`     ${colors.dim}${agent.description}${colors.reset}\n`);
-          }
-        });
+        if (flags.browse) {
+          // For enhanced selection, we already have agent data
+          console.log(`${colors.dim}Selected files: ${selectedAgentFiles.join(', ')}${colors.reset}\n`);
+        } else {
+          // For traditional selection, show agent details
+          const availableAgents = getAvailableAgents();
+          selectedAgentFiles.forEach(file => {
+            const agent = availableAgents.find(a => a.file === file);
+            if (agent) {
+              console.log(`  ${colors.cyan}${colors.bold}${agent.name}${colors.reset}`);
+              console.log(`     ${colors.dim}${agent.description}${colors.reset}\n`);
+            }
+          });
+        }
         
         console.log(`${colors.yellow}${colors.bold}📝 Next Steps:${colors.reset}`);
         console.log(`${colors.dim}1. Make sure Claude Code is initialized: ${colors.reset}${colors.cyan}claude init${colors.reset}`);
@@ -590,8 +1975,15 @@ async function main() {
         } else {
           console.log('⚠️  Claude Code not detected in this project.');
           console.log('ccsetup can create the .claude directory structure for you.\n');
-          const answer = await prompt('Would you like to create .claude directory? (yes/no): ');
-          if (answer !== 'yes') {
+          
+          // Use inquirer instead of readline prompt since rl might be closed
+          const confirmModule = await import('@inquirer/confirm');
+          const confirm = confirmModule.default;
+          const shouldCreate = await confirm({
+            message: 'Would you like to create .claude directory?',
+            default: true
+          });
+          if (!shouldCreate) {
             console.log('\nTo manually initialize Claude Code:');
             console.log('1. Install Claude Code CLI: https://docs.anthropic.com/claude-code/quickstart');
             console.log('2. Run \'claude init\' in your project directory');
@@ -675,7 +2067,83 @@ async function main() {
   } else if (flags.allAgents) {
     selectedAgentFiles = availableAgents.map(a => a.file).filter(validateAgentFile);
     console.log(`\n✅ Including all ${selectedAgentFiles.length} agents (--all-agents flag)`);
-  } else if (!flags.dryRun) {
+  } else if (flags.aiAgents && !flags.dryRun) {
+    // AI-powered agent selection
+    console.log('\n🤖 Analyzing your project to recommend agents...\n');
+    
+    // Get project scan results if available
+    let scanResults = null;
+    if (hasExistingFiles || flags.scanContext || repositoryContext) {
+      scanResults = repositoryContext?.scanResults || (await scanRepositoryForContext(targetDir))?.scanResults;
+    }
+    
+    if (scanResults) {
+      const catalog = new TemplateCatalog();
+      await catalog.load();
+      const aiSelector = new AIAgentSelector(scanResults, catalog.cache);
+      
+      const recommendations = await aiSelector.recommendAgents(5);
+      
+      if (recommendations && recommendations.length > 0) {
+        console.log('🎯 AI Agent Recommendations:\n');
+        recommendations.forEach((rec, index) => {
+          const priority = rec.priority === 'HIGH' ? '🔴' : rec.priority === 'MEDIUM' ? '🟡' : '🟢';
+          console.log(`${priority} ${index + 1}. ${rec.agent.name} - ${rec.agent.purpose}`);
+          console.log(`   💡 ${rec.reason}\n`);
+        });
+        
+        // Let user choose from recommendations
+        const selectModule = await import('@inquirer/select');
+        const select = selectModule.default;
+        
+        const choice = await select({
+          message: 'How would you like to proceed?',
+          choices: [
+            { name: '✅ Use all recommended agents', value: 'all' },
+            { name: '🎯 Select from recommendations', value: 'select' },
+            { name: '🔍 Browse all agents instead', value: 'browse' }
+          ]
+        });
+        
+        if (choice === 'all') {
+          selectedAgentFiles = recommendations.map(rec => 
+            availableAgents.find(a => a.name === rec.agent.name)?.file
+          ).filter(Boolean);
+          console.log(`\n✅ Selected all ${selectedAgentFiles.length} recommended agents`);
+        } else if (choice === 'select') {
+          const checkboxModule = await import('@inquirer/checkbox');
+          const checkbox = checkboxModule.default;
+          
+          const selected = await checkbox({
+            message: 'Select agents from recommendations:',
+            choices: recommendations.map(rec => ({
+              name: `${rec.agent.name} - ${rec.reason}`,
+              value: rec.agent.name,
+              checked: rec.priority === 'HIGH'
+            }))
+          });
+          
+          selectedAgentFiles = selected.map(name => 
+            availableAgents.find(a => a.name === name)?.file
+          ).filter(Boolean);
+          console.log(`\n✅ Selected ${selectedAgentFiles.length} agent${selectedAgentFiles.length === 1 ? '' : 's'}`);
+        } else {
+          // Fall through to regular selection
+          flags.aiAgents = false;
+          flags.agents = true;
+        }
+      } else {
+        console.log('⚠️  Could not generate AI recommendations. Falling back to regular selection.\n');
+        flags.aiAgents = false;
+        flags.agents = true;
+      }
+    } else {
+      console.log('⚠️  Need to scan project first to generate AI recommendations.');
+      console.log('💡 Tip: Use --scan-context with --ai-agents for better recommendations.\n');
+      flags.aiAgents = false;
+      flags.agents = true;
+    }
+  } else if (!flags.dryRun && !flags.aiAgents) {
     // Interactive mode selection
     console.log('\n🤖 How would you like to set up agents for your Claude Code project?\n');
     console.log('Use arrow keys to navigate, Enter to select\n');
@@ -691,19 +2159,27 @@ async function main() {
     const select = selectModule.default;
     
     const agentMode = await select({
-      message: 'Choose your setup mode:',
+      message: 'Would you like to include AI agents in your project?',
       choices: [
         {
-          name: 'Browse Mode - Copy all 50+ agents to /agents folder (explore later)',
-          value: 'browse'
+          name: '✨ Select Agents - Choose specific agents for your needs',
+          value: 'select',
+          description: 'Interactive selection of agents based on your project'
         },
         {
-          name: 'Select Agents - Choose specific agents to include now',
-          value: 'select'
+          name: '🔍 Enhanced Selection - Advanced browsing with search and filters',
+          value: 'enhanced',
+          description: 'Use the enhanced interface with categories, tags, and search'
         },
         {
-          name: 'Skip - Don\'t include any agents',
-          value: 'skip'
+          name: '📚 Copy All Agents - Get all 50+ agents to explore',
+          value: 'browse',
+          description: 'Copies all agents to /agents folder for manual review'
+        },
+        {
+          name: '⏭️  Skip Agents - Just set up the basic structure',
+          value: 'skip',
+          description: 'You can always add agents later'
         }
       ]
     });
@@ -720,6 +2196,10 @@ async function main() {
     } else if (agentMode === 'select') {
       // Interactive selection
       selectedAgentFiles = await selectAgents(availableAgents);
+      console.log(`\n✅ Selected ${selectedAgentFiles.length} agent${selectedAgentFiles.length === 1 ? '' : 's'}`);
+    } else if (agentMode === 'enhanced') {
+      // Enhanced selection with catalog system
+      selectedAgentFiles = await enhancedAgentSelection();
       console.log(`\n✅ Selected ${selectedAgentFiles.length} agent${selectedAgentFiles.length === 1 ? '' : 's'}`);
     }
     
@@ -759,6 +2239,11 @@ async function main() {
         // Skip .claude directory as it will be handled separately
         if (path.basename(src) === '.claude') {
           return; // Don't process .claude directory in regular template scan
+        }
+        
+        // Skip hooks directory - hooks should only be installed to .claude/hooks via --install-hooks
+        if (path.basename(src) === 'hooks') {
+          return; // Don't copy hooks to project root
         }
         
         // Skip agents directory if we're handling it separately
@@ -894,6 +2379,29 @@ async function main() {
 
   scanTemplate(templateDir, targetDir, '', true);
 
+  // Handle repository scanning for context
+  let repositoryContext = null;
+  if (flags.scanContext || (!flags.dryRun && projectName === '.' && !flags.force)) {
+    const hasExistingFiles = allItems.some(item => item.exists);
+    
+    if (hasExistingFiles || flags.scanContext) {
+      if (flags.scanContext || (!flags.force && await shouldScanRepository())) {
+        repositoryContext = await scanRepositoryForContext(targetDir);
+        
+        if (repositoryContext && !flags.dryRun) {
+          const confirmResult = await previewAndConfirmContext(repositoryContext.formattedContext);
+          
+          if (confirmResult === 'n' || confirmResult === 'no') {
+            repositoryContext = null;
+            console.log('✅ Skipping context addition to CLAUDE.md');
+          } else if (confirmResult === 'edit') {
+            console.log('📝 Context editing not yet implemented. Using generated context as-is.');
+          }
+        }
+      }
+    }
+  }
+
   // Handle force flag
   if (flags.force) {
     // Set all strategies to overwrite
@@ -933,18 +2441,30 @@ async function main() {
             console.log('  2) rename    (r) - Save template files with -ccsetup suffix');
             console.log('  3) overwrite (o) - Replace with template versions');
             
-            const userInput = await prompt(`Your choice for ${category.name} [s/r/o]: `);
-            const strategy = normalizeConflictStrategy(userInput);
+            // Use inquirer instead of readline prompt
+            const selectModule = await import('@inquirer/select');
+            const select = selectModule.default;
+            const strategy = await select({
+              message: `Your choice for ${category.name}:`,
+              choices: [
+                { name: '(s)kip - Keep your existing files', value: 'skip' },
+                { name: '(r)ename - Create backups and use template versions', value: 'rename' },
+                { name: '(o)verwrite - Replace with template versions', value: 'overwrite' }
+              ],
+              default: 'skip'
+            });
             
-            if (!strategy) {
-              console.log(`\n❌ Invalid option: "${userInput}". Please use: skip/s/1, rename/r/2, or overwrite/o/3`);
-              if (rl) rl.close();
-              process.exit(1);
-            }
+            // Strategy will always be valid when using select, no need for validation
             
             if (strategy === 'overwrite' && category.key === 'CLAUDE.md') {
-              const confirm = await prompt('⚠️  Are you sure you want to overwrite CLAUDE.md? This will lose your project instructions! (yes/no): ');
-              if (confirm !== 'yes') {
+              // Use inquirer instead of readline prompt
+              const confirmModule = await import('@inquirer/confirm');
+              const confirm = confirmModule.default;
+              const shouldOverwrite = await confirm({
+                message: '⚠️  Are you sure you want to overwrite CLAUDE.md? This will lose your project instructions!',
+                default: false
+              });
+              if (!shouldOverwrite) {
                 conflictStrategies[category.key] = 'skip';
                 console.log('Keeping existing CLAUDE.md');
                 continue;
@@ -1014,10 +2534,28 @@ async function main() {
             console.log(`  📄 ${flags.dryRun ? 'Would create' : 'Created'}: ${path.relative(targetDir, newDest)}`);
           } else if (strategy === 'overwrite') {
             if (!flags.dryRun) {
-              fs.copyFileSync(item.src, item.dest);
+              // Handle CLAUDE.md with context injection on overwrite
+              if (item.relativePath === 'CLAUDE.md' && repositoryContext) {
+                const templateContent = fs.readFileSync(item.src, 'utf8');
+                const enhancedContent = await applyContextToTemplate(
+                  templateContent, 
+                  repositoryContext,
+                  'append'
+                );
+                fs.writeFileSync(item.dest, enhancedContent, 'utf8');
+                console.log(`  ♻️  Replaced CLAUDE.md with project context`);
+              } else {
+                fs.copyFileSync(item.src, item.dest);
+                console.log(`  ♻️  Replaced: ${item.relativePath}`);
+              }
+            } else {
+              if (item.relativePath === 'CLAUDE.md' && repositoryContext) {
+                console.log(`  ♻️  Would replace: ${item.relativePath} (with project context)`);
+              } else {
+                console.log(`  ♻️  Would replace: ${item.relativePath}`);
+              }
             }
             overwrittenCount++;
-            console.log(`  ♻️  ${flags.dryRun ? 'Would replace' : 'Replaced'}: ${item.relativePath}`);
           }
         } else {
           if (!flags.dryRun) {
@@ -1026,9 +2564,26 @@ async function main() {
             if (!fs.existsSync(destDir)) {
               fs.mkdirSync(destDir, { recursive: true });
             }
-            fs.copyFileSync(item.src, item.dest);
+            
+            // Handle CLAUDE.md with context injection
+            if (item.relativePath === 'CLAUDE.md' && repositoryContext) {
+              const templateContent = fs.readFileSync(item.src, 'utf8');
+              const enhancedContent = await applyContextToTemplate(
+                templateContent, 
+                repositoryContext,
+                'append'
+              );
+              fs.writeFileSync(item.dest, enhancedContent, 'utf8');
+              console.log(`  ✨ Created CLAUDE.md with project context`);
+            } else {
+              fs.copyFileSync(item.src, item.dest);
+            }
           } else {
-            console.log(`  ✨ Would copy: ${item.relativePath}`);
+            if (item.relativePath === 'CLAUDE.md' && repositoryContext) {
+              console.log(`  ✨ Would copy: ${item.relativePath} (with project context)`);
+            } else {
+              console.log(`  ✨ Would copy: ${item.relativePath}`);
+            }
           }
           copiedCount++;
         }
@@ -1082,6 +2637,9 @@ async function main() {
     if (claudeInitResult && claudeInitResult.createdItems.length > 0) {
       console.log(`  📁 ${claudeInitResult.createdItems.length} items created in .claude directory`);
     }
+    if (repositoryContext && !flags.dryRun) {
+      console.log(`  🔍 Project context automatically added to CLAUDE.md`);
+    }
   }
   
   if (!flags.dryRun) {
@@ -1112,6 +2670,71 @@ async function main() {
     if (renamedCount > 0) {
       console.log('\n💡 Tip: Review the -ccsetup files to see template examples');
       console.log('   You can compare them with your existing files or copy sections you need');
+    }
+    
+    // Install hooks as part of full setup
+    if (setupMode === 'full' && !flags.dryRun) {
+      console.log('\n🪝 Installing workflow selection hook...');
+      
+      // Check if .claude directory exists
+      const claudeDir = path.join(targetDir, '.claude');
+      if (fs.existsSync(claudeDir)) {
+        try {
+          // Create hooks directory
+          const hooksDir = path.join(claudeDir, 'hooks');
+          if (!fs.existsSync(hooksDir)) {
+            fs.mkdirSync(hooksDir, { recursive: true });
+          }
+          
+          // Copy workflow-selector hook
+          const hookSourceDir = path.join(templateDir, 'hooks', 'workflow-selector');
+          const hookDestDir = path.join(hooksDir, 'workflow-selector');
+          
+          if (fs.existsSync(hookSourceDir)) {
+            if (!fs.existsSync(hookDestDir)) {
+              fs.mkdirSync(hookDestDir, { recursive: true });
+            }
+            
+            const hookFile = path.join(hookSourceDir, 'index.js');
+            const destFile = path.join(hookDestDir, 'index.js');
+            fs.copyFileSync(hookFile, destFile);
+            
+            // Update settings.json
+            const settingsFile = path.join(claudeDir, 'settings.json');
+            let settings = {};
+            
+            if (fs.existsSync(settingsFile)) {
+              try {
+                settings = JSON.parse(fs.readFileSync(settingsFile, 'utf8'));
+              } catch (e) {
+                // Start with empty settings
+              }
+            }
+            
+            if (!settings.hooks) {
+              settings.hooks = {};
+            }
+            
+            settings.hooks.UserPromptSubmit = [
+              {
+                "matcher": ".*",
+                "hooks": [
+                  {
+                    "type": "command",
+                    "command": "node $CLAUDE_PROJECT_DIR/.claude/hooks/workflow-selector/index.js"
+                  }
+                ]
+              }
+            ];
+            
+            fs.writeFileSync(settingsFile, JSON.stringify(settings, null, 2));
+            console.log('  ✅ Workflow selection hook installed');
+            console.log('  📝 Hook will analyze prompts and suggest appropriate workflows');
+          }
+        } catch (error) {
+          console.warn('  ⚠️  Could not install workflow hook:', error.message);
+        }
+      }
     }
     
     console.log('\nHappy coding with Claude! 🎉');
