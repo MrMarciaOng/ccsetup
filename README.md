@@ -55,7 +55,7 @@ Scan existing projects to auto-generate CLAUDE.md context:
 ```bash
 ccsetup scan                           # Scan current directory
 ccsetup scan --update                  # Update existing CLAUDE.md
-ccsetup scan --update --merge-strategy interactive  # Review each change
+ccsetup scan --update --merge-strategy replace       # Replace CLAUDE.md entirely
 ```
 
 Detects languages, frameworks, project structure, and commands from package.json/Makefile/Docker Compose.

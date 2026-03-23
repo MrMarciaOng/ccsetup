@@ -1350,16 +1350,13 @@ Please update this file with relevant project information as you develop.
         console.log('✅ CLAUDE.md updated successfully!\n');
         
         // Provide feedback based on merge strategy used
-        if (mergeStrategy === 'interactive') {
-          console.log('   📋 Interactive merge completed');
-          console.log('   ✓ Your selections have been applied');
-        } else if (mergeStrategy === 'smart') {
-          console.log('   🧠 Smart merge completed');
-          console.log('   ✓ Your customizations preserved');
-          console.log('   ✓ New findings integrated');
-        } else if (mergeStrategy === 'overwrite') {
-          console.log('   ♻️  Fresh scan completed');
-          console.log('   ✓ New CLAUDE.md generated from current codebase');
+        if (mergeStrategy === 'smart') {
+          console.log('   Smart merge completed');
+          console.log('   - Your customizations preserved');
+          console.log('   - New findings integrated');
+        } else if (mergeStrategy === 'replace') {
+          console.log('   Replace completed');
+          console.log('   - New CLAUDE.md generated from current codebase');
         }
         
         console.log(`   📦 Backup saved: ${path.basename(backupPath)}`);
@@ -1819,23 +1816,19 @@ async function main() {
       return;
     }
     
-    if (setupMode === 'scan-only' || setupMode === 'scan-smart' || setupMode === 'scan-interactive') {
+    if (setupMode === 'scan-only' || setupMode === 'scan-smart' || setupMode === 'scan-replace') {
       // Close readline if open
       if (rl) {
         rl.close();
         rl = null;
       }
-      
+
       // Set appropriate flags based on mode
-      if (setupMode === 'scan-smart') {
-        flags.scanOnly = true;
-        flags.mergeStrategy = 'smart';
-      } else if (setupMode === 'scan-interactive') {
-        flags.scanOnly = true;
-        flags.mergeStrategy = 'interactive';
+      flags.scanOnly = true;
+      if (setupMode === 'scan-replace') {
+        flags.mergeStrategy = 'replace';
       } else {
-        flags.scanOnly = true;
-        flags.mergeStrategy = 'overwrite';
+        flags.mergeStrategy = 'smart';
       }
       
       await scanOnlyMode(flags.mergeStrategy);

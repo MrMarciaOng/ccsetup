@@ -43,7 +43,7 @@ for (let i = 0; i < args.length; i++) {
     i++;
   } else if (arg === '--merge-strategy') {
     const strategy = args[i + 1];
-    const validStrategies = ['smart', 'union', 'preserve-user', 'update-scan', 'interactive'];
+    const validStrategies = ['smart', 'replace'];
     if (validStrategies.includes(strategy)) {
       flags.mergeStrategy = strategy;
     } else {
@@ -72,20 +72,19 @@ Options:
   --dry-run                 Preview changes without applying them
   --interactive             Interactive scan configuration
   --format <type>           Output format: md, json, clipboard (default: md)
-  --merge-strategy <type>   Merge strategy: smart, union, preserve-user, update-scan, interactive (default: smart)
+  --merge-strategy <type>   Merge strategy: smart, replace (default: smart)
   --help, -h                Show this help message
 
 Examples:
-  ccsetup scan                        # Scan current directory
-  ccsetup scan ./my-project           # Scan specific directory
-  ccsetup scan --update               # Update existing CLAUDE.md
-  ccsetup scan --depth 3              # Limit scan depth
-  ccsetup scan --ignore "test/**,*.log" # Exclude patterns
-  ccsetup scan --dry-run              # Preview what would be scanned
-  ccsetup scan --interactive          # Configure scan interactively
-  ccsetup scan --format clipboard     # Copy results to clipboard
-  ccsetup scan --merge-strategy union # Use union merge for tech stacks
-  ccsetup scan --update --merge-strategy interactive # Interactively resolve conflicts
+  ccsetup scan                            # Scan current directory
+  ccsetup scan ./my-project               # Scan specific directory
+  ccsetup scan --update                   # Update existing CLAUDE.md
+  ccsetup scan --depth 3                  # Limit scan depth
+  ccsetup scan --ignore "test/**,*.log"   # Exclude patterns
+  ccsetup scan --dry-run                  # Preview what would be scanned
+  ccsetup scan --interactive              # Configure scan interactively
+  ccsetup scan --format clipboard         # Copy results to clipboard
+  ccsetup scan --merge-strategy replace   # Replace existing CLAUDE.md entirely
 
 The scan command analyzes your project to generate contextual information
 for Claude Code, including tech stack, project structure, available commands,
@@ -292,11 +291,8 @@ async function updateClaudeMd(projectPath, repositoryContext, dryRun = false) {
     console.log(`✓ ${changes.unchanged} unchanged sections`);
     
     const strategyDescriptions = {
-      'smart': 'Preserves user content, updates scan-generated sections intelligently',
-      'union': 'Combines content from both sources (useful for tech stacks)',
-      'preserve-user': 'Keeps all existing content, only adds completely new sections',
-      'update-scan': 'Updates only scan-generated sections, preserves user sections',
-      'interactive': 'Review and choose resolution for each conflicting section'
+      'smart': 'Preserves user content while adding new findings intelligently',
+      'replace': 'Replaces CLAUDE.md entirely with new scan results'
     };
     
     console.log(`\n🔄 Using merge strategy: ${flags.mergeStrategy}`);

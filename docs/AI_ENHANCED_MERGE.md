@@ -2,167 +2,54 @@
 
 ## Overview
 
-ccsetup now uses Claude Code commands to provide intelligent merge suggestions and conflict resolution when updating CLAUDE.md files. This makes the merge process smarter and more context-aware.
+ccsetup uses Claude Code commands to provide intelligent merge suggestions and conflict resolution when updating CLAUDE.md files.
 
-## Features
+## Merge Strategies
 
-### 1. 🤖 AI Strategy Recommendation
+There are two merge strategies:
 
-When an existing CLAUDE.md is detected, Claude analyzes both files and recommends the best merge strategy:
+### 1. Smart Merge (default)
 
-```
-📋 Existing CLAUDE.md detected!
-🤖 AI Recommendation: 🧠 Smart Merge - Intelligently combine sections
-```
+Preserves your customizations while adding newly detected information. Handles section-by-section merging with type-aware logic for tech stacks, commands, lists, and project structure.
 
-**Strategies AI might recommend:**
-- **🧠 Smart Merge** - When content is complementary
-- **👀 Interactive** - When there are important conflicts
-- **🔄 Fresh Scan** - When existing content is outdated
-- **🛡️ Preserve** - When existing content is well-maintained
-
-### 2. 📊 AI Conflict Analysis
-
-For each conflicting section, AI provides:
-
-```
-═══════════════════════════════════════════════════════════
-📋 Conflict in section: Tech Stack
-───────────────────────────────────────────────────────────
-
-📄 Your current content:
-   - **Frontend**: React, TypeScript
-   - **State**: Redux
-   - **Styling**: CSS Modules
-
-🔍 New content from scan:
-   - **Frontend**: React, TypeScript
-   - **Build**: Vite
-   - **Styling**: Tailwind CSS
-
-🤖 AI Analysis:
-   Both versions include React and TypeScript. Existing has Redux and CSS Modules.
-   New scan found Vite and Tailwind CSS. The new version appears more complete.
-   Merging both would create a comprehensive tech stack list.
-   💡 Recommendation: 🤝 Merge both
-───────────────────────────────────────────────────────────
+```bash
+ccsetup scan --update
+ccsetup scan --update --merge-strategy smart
 ```
 
-### 3. 🤝 AI-Powered Content Merging
+### 2. Replace
 
-When you select "Merge both", AI intelligently combines content:
+Full replacement with new scan results. Creates a brand new CLAUDE.md from your current codebase.
 
-**Before:**
-```markdown
-## Tech Stack (Existing)
-- **Frontend**: React, TypeScript
-- **State**: Redux
-
-## Tech Stack (New Scan)
-- **Frontend**: React, TypeScript
-- **Build**: Vite
+```bash
+ccsetup scan --update --merge-strategy replace
 ```
 
-**After AI Merge:**
-```markdown
-## Tech Stack
-- **Frontend**: React, TypeScript
-- **State**: Redux
-- **Build**: Vite
-```
+## AI Features
 
-### 4. 📑 AI Section Ordering
+### Conflict Analysis
 
-AI optimizes section order for better Claude Code comprehension:
+For conflicting sections during interactive review, AI provides:
+- What's different between versions
+- Which version is more complete
+- Whether merging both would be beneficial
+- A recommended resolution
 
-```
-🤖 Using AI-optimized section order
-```
+### AI-Powered Content Merging
 
-Sections are reordered based on:
-- Logical flow for AI understanding
-- Dependencies between sections
-- Importance for project context
+When you select "Merge both" during interactive review, AI intelligently combines content by:
+- Preserving user customizations
+- Adding new information
+- Removing duplicates
+- Maintaining formatting
 
 ## How It Works
 
-### Technology Stack
 - Uses `claude --print` command for AI analysis
 - Falls back gracefully if Claude Code isn't installed
 - All AI features are optional enhancements
 
-### AI Prompts Used
-
-1. **Strategy Analysis**
-   - Analyzes file sizes and content quality
-   - Considers user customizations
-   - Evaluates scan completeness
-
-2. **Conflict Analysis**
-   - Identifies differences
-   - Assesses completeness
-   - Provides merge recommendations
-
-3. **Content Merging**
-   - Preserves user customizations
-   - Adds new information
-   - Removes duplicates
-   - Maintains formatting
-
-## Usage Examples
-
-### Basic Scan with AI
-```bash
-cd existing-project
-ccsetup --scan-only
-```
-
-### Interactive Merge with AI
-```bash
-ccsetup . --scan-context
-```
-
-### Full Setup with AI
-```bash
-ccsetup .
-```
-
-## Benefits
-
-1. **Smarter Decisions** - AI helps choose the best merge strategy
-2. **Better Context** - Understand what changed and why
-3. **Cleaner Merges** - AI combines content intelligently
-4. **Time Saving** - Automated analysis and recommendations
-5. **Graceful Fallback** - Works without Claude Code too
-
 ## Requirements
 
 - Claude Code CLI installed (optional but recommended)
-- Works with all merge strategies (smart, interactive, overwrite)
 - No additional configuration needed
-
-## Privacy & Security
-
-- AI only analyzes CLAUDE.md content
-- No sensitive code is sent to AI
-- All processing happens locally via Claude Code CLI
-- Can be disabled by not having Claude Code installed
-
-## Troubleshooting
-
-### AI features not working?
-1. Check if Claude Code is installed: `which claude`
-2. Verify Claude Code works: `claude --version`
-3. AI features automatically disable if not available
-
-### Getting unexpected recommendations?
-- AI considers multiple factors (file size, content quality, customizations)
-- You can always override AI recommendations
-- Use `--force` to skip all prompts
-
-## Future Enhancements
-
-- Custom merge rules via configuration
-- Learning from user choices
-- Multi-file conflict resolution
-- Project-type specific strategies
