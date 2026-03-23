@@ -80,37 +80,7 @@ chore(deps): update inquirer to 9.2.0
 
 **PR Title**: Use the same format as commit messages
 
-**PR Description Template:**
-```markdown
-## Summary
-Brief description of what this PR does and why it's needed.
-
-## Changes
-- List of specific changes made
-- Technical implementation details if relevant
-
-## Testing
-- [ ] Tests pass (if applicable)
-- [ ] Manual testing completed
-- [ ] No console errors or warnings
-
-## Manual Testing Steps
-1. Describe steps to manually test the feature
-2. Expected behavior and edge cases tested
-
-## Screenshots (if UI changes)
-Attach relevant screenshots here
-
-## Related Issues
-Closes #XXX (if applicable)
-
-## Checklist
-- [ ] Code follows project conventions
-- [ ] Self-documented code without unnecessary comments
-- [ ] All tests pass
-- [ ] Documentation updated if needed
-- [ ] No sensitive information exposed
-```
+The PR description template is in `.github/PULL_REQUEST_TEMPLATE.md` and GitHub will apply it automatically when opening a PR.
 
 ## Common Commands
 ```bash
