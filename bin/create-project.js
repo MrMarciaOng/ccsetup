@@ -558,7 +558,7 @@ async function initializeClaudeDirectory(selectedAgentFiles, conflictStrategy, d
     }
     
     // Copy selected agents to .claude/agents
-    const templateAgentsDir = path.join(templateDir, 'agents');
+    const templateAgentsDir = path.join(templateDir, '.claude', 'agents');
     let copiedAgents = 0;
     let skippedAgents = 0;
     
@@ -680,7 +680,7 @@ function parseAgentFrontmatter(filePath) {
 
 // Function to get available agents
 function getAvailableAgents() {
-  const agentsDir = path.join(templateDir, 'agents');
+  const agentsDir = path.join(templateDir, '.claude', 'agents');
   const agents = [];
   
   try {

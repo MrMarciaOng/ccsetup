@@ -1,7 +1,7 @@
 {
   "name": "ccsetup",
   "version": "1.2.0",
-  "description": "Interactive setup for Claude Code projects with smart context scanning, merge strategies, 50+ agents, and orchestration workflows",
+  "description": "Interactive setup for Claude Code projects with smart context scanning, merge strategies, 8 core agents, and orchestration workflows",
   "bin": {
     "ccsetup": "bin/create-project.js"
   },
