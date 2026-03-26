@@ -16,8 +16,11 @@
 .
 ├── CLAUDE.md          # This file - project instructions for Claude
 ├── .claude/
-│   └── agents/        # 8 core agents (backend, blockchain, checker, coder, frontend, planner, researcher, shadcn)
+│   ├── agents/        # 8 core agents (backend, blockchain, checker, coder, frontend, planner, researcher, shadcn)
+│   └── skills/        # /prd and /ralph slash commands
 ├── agents/            # Documentation only — see .claude/agents/ for active agents
+├── scripts/
+│   └── ralph/         # Autonomous agent loop (ralph.sh + agent instructions)
 ├── docs/              # Project documentation
 ├── plans/             # Project plans and architectural documents
 └── tickets/           # Task tickets and issues
@@ -60,9 +63,37 @@
 
 8 core agents are pre-installed in `.claude/agents/`. See @agents/README.md for the full list and instructions for adding custom agents.
 
+## Skills (Slash Commands)
+
+- **/prd** — Scans the codebase, then generates a structured PRD with real file paths and auto-detected quality criteria. Saves to `tasks/prd-[feature-name].md`.
+- **/ralph** — Converts a PRD into `scripts/ralph/prd.json` for autonomous execution with quality checks and file hints per story.
+
+## Ralph — Autonomous Agent Loop
+
+Ralph implements user stories from a PRD one at a time in a loop, with subagent verification after each story.
+
+```bash
+./scripts/ralph/ralph.sh                          # Default: 10 iterations with amp
+./scripts/ralph/ralph.sh --tool claude             # Use Claude Code
+./scripts/ralph/ralph.sh --tool claude --model opus 20  # Specify model + iterations
+```
+
+Typical workflow: `/prd` → `/ralph` → `./scripts/ralph/ralph.sh`
+
 ## Agent Orchestration
 
 See @docs/agent-orchestration.md for detailed workflow patterns on how to chain agents effectively.
+
+## Workflow Selector Hook (Optional)
+
+An optional hook that suggests agent workflows based on your prompt. Claude will ask before applying.
+
+To activate after installation:
+```bash
+export CCSETUP_WORKFLOW=1
+```
+
+When unset, the hook is inactive and Claude uses its default behavior. Install the hook with `npx ccsetup --install-hooks`.
 
 ## Tickets
 

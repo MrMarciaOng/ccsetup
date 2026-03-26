@@ -86,6 +86,24 @@ Pre-configured multi-agent workflows:
 
 See [docs/agent-orchestration.md](docs/agent-orchestration.md) for details.
 
+### Workflow Selector Hook (Optional)
+
+An optional hook that analyzes your prompts and suggests the best agent workflow for the task. Claude will ask before applying the suggestion.
+
+**During setup**, you'll be asked if you want to install it. You can also install it later:
+
+```bash
+npx ccsetup --install-hooks
+```
+
+**To activate**, set the environment variable:
+
+```bash
+export CCSETUP_WORKFLOW=1
+```
+
+When active, the hook suggests workflows like "Feature Development: Researcher → Planner → Coder → Checker" and asks if you'd like to follow it. When the env var is unset, the hook exits silently and Claude uses its default behavior.
+
 ## Ralph — Autonomous Agent Loop
 
 Ralph is an autonomous coding agent that implements user stories from a PRD one at a time, with built-in subagent verification.

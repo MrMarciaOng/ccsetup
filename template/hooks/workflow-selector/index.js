@@ -3,6 +3,14 @@
 const fs = require('fs');
 const path = require('path');
 
+// Environment variable toggle — exit early if not enabled
+// Enable with: export CCSETUP_WORKFLOW=1
+const enabled = process.env.CCSETUP_WORKFLOW;
+if (!enabled || (enabled !== '1' && enabled.toLowerCase() !== 'true')) {
+  console.log('{}');
+  process.exit(0);
+}
+
 // Simple workflow selector that reads from agent-orchestration.md
 class WorkflowSelector {
   constructor() {
@@ -372,13 +380,13 @@ if (require.main === module) {
       const workflow = await selector.selectWorkflow(prompt);
       const agents = selector.filterAgentsByAvailability(workflow.agents);
       
-      // Output suggestion
+      // Output suggestion — Claude should ask the user before applying
       const output = {
         workflow: workflow.name,
         agents: agents,
-        message: `Suggested workflow: ${workflow.name} with agents: ${agents.join(' → ')}`
+        message: `[Workflow Suggestion] Based on this prompt, the "${workflow.name}" workflow may be a good fit: ${agents.join(' → ')}. Ask the user if they'd like to follow this workflow or just proceed normally with Claude Code's default behavior.`
       };
-      
+
       console.log(JSON.stringify(output));
     } catch (error) {
       // Silent fail - just return empty

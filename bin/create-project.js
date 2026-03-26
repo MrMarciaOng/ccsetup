@@ -508,6 +508,23 @@ async function initializeClaudeDirectory(selectedAgentFiles, conflictStrategy, d
       }
     }
     
+    // Copy .claude/settings.json
+    const settingsSrc = path.join(templateClaudeDir, 'settings.json');
+    const settingsDest = path.join(claudeDir, 'settings.json');
+    if (fs.existsSync(settingsSrc)) {
+      if (!fs.existsSync(settingsDest)) {
+        if (!dryRun) {
+          fs.copyFileSync(settingsSrc, settingsDest);
+        }
+        createdItems.push('.claude/settings.json');
+        if (dryRun) {
+          console.log('  ✨ Would copy: .claude/settings.json');
+        }
+      } else {
+        skippedItems.push('.claude/settings.json');
+      }
+    }
+
     // Copy .claude/agents/README.md
     const agentsReadmeSrc = path.join(templateClaudeDir, 'agents', 'README.md');
     const agentsReadmeDest = path.join(claudeAgentsDir, 'README.md');
@@ -557,6 +574,36 @@ async function initializeClaudeDirectory(selectedAgentFiles, conflictStrategy, d
       }
     }
     
+    // Copy .claude/skills/ directory (recursively)
+    const templateSkillsDir = path.join(templateClaudeDir, 'skills');
+    if (fs.existsSync(templateSkillsDir)) {
+      const claudeSkillsDir = path.join(claudeDir, 'skills');
+      const skillDirs = fs.readdirSync(templateSkillsDir).filter(d => {
+        return fs.statSync(path.join(templateSkillsDir, d)).isDirectory();
+      });
+
+      for (const skillName of skillDirs) {
+        const skillSrcDir = path.join(templateSkillsDir, skillName);
+        const skillDestDir = path.join(claudeSkillsDir, skillName);
+        const skillFile = path.join(skillSrcDir, 'SKILL.md');
+
+        if (fs.existsSync(skillFile)) {
+          if (!fs.existsSync(path.join(skillDestDir, 'SKILL.md'))) {
+            if (!dryRun) {
+              fs.mkdirSync(skillDestDir, { recursive: true });
+              fs.copyFileSync(skillFile, path.join(skillDestDir, 'SKILL.md'));
+            }
+            createdItems.push(`.claude/skills/${skillName}/SKILL.md`);
+            if (dryRun) {
+              console.log(`  ✨ Would copy: .claude/skills/${skillName}/SKILL.md`);
+            }
+          } else {
+            skippedItems.push(`.claude/skills/${skillName}/SKILL.md`);
+          }
+        }
+      }
+    }
+
     // Copy selected agents to .claude/agents
     const templateAgentsDir = path.join(templateDir, '.claude', 'agents');
     let copiedAgents = 0;
@@ -2542,64 +2589,80 @@ async function main() {
       console.log('   You can compare them with your existing files or copy sections you need');
     }
     
-    // Install hooks as part of full setup
+    // Ask user if they want the workflow selector hook
     if (setupMode === 'full' && !flags.dryRun) {
-      console.log('\n🪝 Installing workflow selection hook...');
-      
-      // Check if .claude directory exists
       const claudeDir = path.join(targetDir, '.claude');
       if (fs.existsSync(claudeDir)) {
         try {
-          // Create hooks directory
-          const hooksDir = path.join(claudeDir, 'hooks');
-          if (!fs.existsSync(hooksDir)) {
-            fs.mkdirSync(hooksDir, { recursive: true });
+          let wantHook = false;
+
+          if (!flags.force) {
+            const confirmModule = await import('@inquirer/confirm');
+            const confirm = confirmModule.default;
+
+            wantHook = await confirm({
+              message: 'Enable workflow selector hook? (suggests agent workflows per prompt, controlled via CCSETUP_WORKFLOW env var)',
+              default: false
+            });
           }
-          
-          // Copy workflow-selector hook
-          const hookSourceDir = path.join(templateDir, 'hooks', 'workflow-selector');
-          const hookDestDir = path.join(hooksDir, 'workflow-selector');
-          
-          if (fs.existsSync(hookSourceDir)) {
-            if (!fs.existsSync(hookDestDir)) {
-              fs.mkdirSync(hookDestDir, { recursive: true });
+
+          if (wantHook) {
+            // Create hooks directory
+            const hooksDir = path.join(claudeDir, 'hooks');
+            if (!fs.existsSync(hooksDir)) {
+              fs.mkdirSync(hooksDir, { recursive: true });
             }
-            
-            const hookFile = path.join(hookSourceDir, 'index.js');
-            const destFile = path.join(hookDestDir, 'index.js');
-            fs.copyFileSync(hookFile, destFile);
-            
-            // Update settings.json
-            const settingsFile = path.join(claudeDir, 'settings.json');
-            let settings = {};
-            
-            if (fs.existsSync(settingsFile)) {
-              try {
-                settings = JSON.parse(fs.readFileSync(settingsFile, 'utf8'));
-              } catch (e) {
-                // Start with empty settings
+
+            // Copy workflow-selector hook
+            const hookSourceDir = path.join(templateDir, 'hooks', 'workflow-selector');
+            const hookDestDir = path.join(hooksDir, 'workflow-selector');
+
+            if (fs.existsSync(hookSourceDir)) {
+              if (!fs.existsSync(hookDestDir)) {
+                fs.mkdirSync(hookDestDir, { recursive: true });
               }
-            }
-            
-            if (!settings.hooks) {
-              settings.hooks = {};
-            }
-            
-            settings.hooks.UserPromptSubmit = [
-              {
-                "matcher": ".*",
-                "hooks": [
-                  {
-                    "type": "command",
-                    "command": "node $CLAUDE_PROJECT_DIR/.claude/hooks/workflow-selector/index.js"
-                  }
-                ]
+
+              const hookFile = path.join(hookSourceDir, 'index.js');
+              const destFile = path.join(hookDestDir, 'index.js');
+              fs.copyFileSync(hookFile, destFile);
+
+              // Update settings.json
+              const settingsFile = path.join(claudeDir, 'settings.json');
+              let settings = {};
+
+              if (fs.existsSync(settingsFile)) {
+                try {
+                  settings = JSON.parse(fs.readFileSync(settingsFile, 'utf8'));
+                } catch (e) {
+                  // Start with empty settings
+                }
               }
-            ];
-            
-            fs.writeFileSync(settingsFile, JSON.stringify(settings, null, 2));
-            console.log('  ✅ Workflow selection hook installed');
-            console.log('  📝 Hook will analyze prompts and suggest appropriate workflows');
+
+              if (!settings.hooks) {
+                settings.hooks = {};
+              }
+
+              settings.hooks.UserPromptSubmit = [
+                {
+                  "matcher": ".*",
+                  "hooks": [
+                    {
+                      "type": "command",
+                      "command": "node $CLAUDE_PROJECT_DIR/.claude/hooks/workflow-selector/index.js"
+                    }
+                  ]
+                }
+              ];
+
+              fs.writeFileSync(settingsFile, JSON.stringify(settings, null, 2));
+              console.log('  ✅ Workflow selection hook installed');
+              console.log('  📝 To activate, set the environment variable:');
+              console.log('     export CCSETUP_WORKFLOW=1');
+              console.log('  💡 The hook suggests workflows and asks before applying them');
+            }
+          } else {
+            console.log('  ⏭️  Skipped workflow selector hook');
+            console.log('  💡 You can install it later with: npx ccsetup --install-hooks');
           }
         } catch (error) {
           console.warn('  ⚠️  Could not install workflow hook:', error.message);
