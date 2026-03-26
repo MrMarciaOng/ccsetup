@@ -182,8 +182,14 @@ credentials/
 
 # Custom project specific
 .claude/
+!template/.claude/
 .cache/
 
 # Test artifact directories
 ccsetup-e2e-*/
 ccsetup-tests-*/
+
+# Generated test output (boilerplate created by test runs)
+__test__/*-test/
+__test__/**/CLAUDE.md
+__test__/**/CLAUDE.md.backup-*
