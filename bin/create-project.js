@@ -604,6 +604,36 @@ async function initializeClaudeDirectory(selectedAgentFiles, conflictStrategy, d
       }
     }
 
+    // Copy template/hooks/ to .claude/hooks/ (all hook directories)
+    const templateHooksDir = path.join(templateDir, 'hooks');
+    if (fs.existsSync(templateHooksDir)) {
+      const claudeHooksDir = path.join(claudeDir, 'hooks');
+      const hookDirs = fs.readdirSync(templateHooksDir).filter(d => {
+        return fs.statSync(path.join(templateHooksDir, d)).isDirectory();
+      });
+
+      for (const hookName of hookDirs) {
+        const hookSrcDir = path.join(templateHooksDir, hookName);
+        const hookDestDir = path.join(claudeHooksDir, hookName);
+        const hookFile = path.join(hookSrcDir, 'index.js');
+
+        if (fs.existsSync(hookFile)) {
+          if (!fs.existsSync(path.join(hookDestDir, 'index.js'))) {
+            if (!dryRun) {
+              fs.mkdirSync(hookDestDir, { recursive: true });
+              fs.copyFileSync(hookFile, path.join(hookDestDir, 'index.js'));
+            }
+            createdItems.push(`.claude/hooks/${hookName}/index.js`);
+            if (dryRun) {
+              console.log(`  ✨ Would copy: .claude/hooks/${hookName}/index.js`);
+            }
+          } else {
+            skippedItems.push(`.claude/hooks/${hookName}/index.js`);
+          }
+        }
+      }
+    }
+
     // Copy selected agents to .claude/agents
     const templateAgentsDir = path.join(templateDir, '.claude', 'agents');
     let copiedAgents = 0;

@@ -17,10 +17,12 @@
 ├── CLAUDE.md          # This file - project instructions for Claude
 ├── .claude/
 │   ├── agents/        # 8 core agents (backend, blockchain, checker, coder, frontend, planner, researcher, shadcn)
-│   └── skills/        # /prd and /ralph slash commands
+│   ├── skills/        # /prd, /ralph, and /codex-review slash commands
+│   └── hooks/         # Workflow selector and codex-review hooks
 ├── agents/            # Documentation only — see .claude/agents/ for active agents
 ├── scripts/
-│   └── ralph/         # Autonomous agent loop (ralph.sh + agent instructions)
+│   ├── ralph/         # Autonomous agent loop (ralph.sh + agent instructions)
+│   └── codex-review/  # Codex CLI architectural review script
 ├── docs/              # Project documentation
 ├── plans/             # Project plans and architectural documents
 └── tickets/           # Task tickets and issues
@@ -67,6 +69,7 @@
 
 - **/prd** — Scans the codebase, then generates a structured PRD with real file paths and auto-detected quality criteria. Saves to `tasks/prd-[feature-name].md`.
 - **/ralph** — Converts a PRD into `scripts/ralph/prd.json` for autonomous execution with quality checks and file hints per story.
+- **/codex-review** — Gets a second-opinion architectural review of a plan file from Codex CLI. Iterates up to 3 times, refining the plan based on feedback.
 
 ## Ralph — Autonomous Agent Loop
 
@@ -94,6 +97,17 @@ export CCSETUP_WORKFLOW=1
 ```
 
 When unset, the hook is inactive and Claude uses its default behavior. Install the hook with `npx ccsetup --install-hooks`.
+
+## Codex Review Hook (Optional)
+
+An optional hook that suggests running `/codex-review` when a plan file is modified. Triggers on the `Stop` event.
+
+To activate:
+```bash
+export CCSETUP_CODEX_REVIEW=1
+```
+
+When unset, the hook is inactive and produces no output.
 
 ## Tickets
 
