@@ -1,6 +1,6 @@
 # Template Catalog System
 
-The template catalog system provides a powerful foundation for browsing, filtering, and selecting from ccsetup's collection of 50+ agent templates. This system implements Phase 1 of the template selection feature as outlined in PLAN-009.
+The template catalog system provides a powerful foundation for browsing, filtering, and selecting from ccsetup's collection of 8 core agent templates. This system implements Phase 1 of the template selection feature as outlined in PLAN-009.
 
 ## Overview
 
@@ -25,7 +25,7 @@ The template catalog system consists of:
 - Caching for performance
 
 ### Generated Metadata (`metadata/agents.json`)
-- Contains metadata for all 52 agents
+- Contains metadata for all 8 agents
 - Organized by categories: Development, Backend, Planning, AI/ML, etc.
 - Includes tags, tools, examples, and workflows for each agent
 

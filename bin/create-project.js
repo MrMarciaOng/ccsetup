@@ -2119,7 +2119,7 @@ async function main() {
           description: 'Use the enhanced interface with categories, tags, and search'
         },
         {
-          name: '📚 Copy All Agents - Get all 50+ agents to explore',
+          name: '📚 Copy All Agents - Get all 8 agents to explore',
           value: 'browse',
           description: 'Copies all agents to /agents folder for manual review'
         },

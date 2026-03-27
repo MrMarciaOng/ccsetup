@@ -5,7 +5,7 @@
 This plan implements a comprehensive template selection system similar to aitmpl.com for ccsetup, transforming it from a simple boilerplate generator into a powerful template marketplace. The system will provide categorized browsing, filtering, search, and selective installation of agents, commands, MCPs, and project templates.
 
 Based on analysis of the existing codebase, ccsetup already has:
-- 50+ agent templates with frontmatter metadata
+- 8 core agent templates with frontmatter metadata
 - Robust interactive selection using inquirer 
 - Strong file copying and conflict resolution
 - Template discovery and validation functions
@@ -107,7 +107,7 @@ const flags = {
    - Category and tag management
 
 3. **Generate initial metadata files**
-   - Extract metadata from 50+ existing agents
+   - Extract metadata from 8 core agents
    - Create structured JSON metadata files
    - Validate metadata completeness
 
