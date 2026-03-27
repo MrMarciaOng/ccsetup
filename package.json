@@ -45,7 +45,8 @@
     "jest": "^30.0.5"
   },
   "scripts": {
-    "test": "jest",
+    "test": "jest --testPathIgnorePatterns integration",
+    "test:integration": "jest --testPathPatterns integration",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "metadata:generate": "node scripts/generate-metadata.js",

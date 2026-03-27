@@ -27,12 +27,13 @@ my-project/
 ├── GEMINI.md              # Gemini setup (optional)
 ├── .claude/
 │   ├── agents/            # 8 core agents
-│   ├── skills/            # /prd and /ralph slash commands
+│   ├── skills/            # /prd, /ralph, and /codex-review slash commands
 │   └── settings.json
 ├── agents/
 │   └── README.md          # Agent documentation
 ├── scripts/
-│   └── ralph/             # Autonomous agent loop
+│   ├── ralph/             # Autonomous agent loop
+│   └── codex-review/      # Codex CLI review script
 ├── docs/
 │   ├── ROADMAP.md         # Development roadmap
 │   └── agent-orchestration.md
@@ -48,6 +49,7 @@ backend, blockchain, checker, coder, frontend, planner, researcher, shadcn
 
 - **/prd** — Scans your codebase (tech stack, quality gates, architecture), then generates a structured PRD with real file paths and auto-detected quality criteria
 - **/ralph** — Converts a PRD into `prd.json` format for autonomous execution, with exact quality check commands and file hints per story
+- **/codex-review** — Gets a second-opinion architectural review of a plan from OpenAI's Codex CLI, with up to 3 iterative feedback rounds
 
 ## Key Options
 
@@ -103,6 +105,65 @@ export CCSETUP_WORKFLOW=1
 ```
 
 When active, the hook suggests workflows like "Feature Development: Researcher → Planner → Coder → Checker" and asks if you'd like to follow it. When the env var is unset, the hook exits silently and Claude uses its default behavior.
+
+## Codex Review — Second-Opinion Plan Review
+
+Get an architectural review of your plans from OpenAI's Codex CLI. Useful for catching blind spots before implementation.
+
+### Usage
+
+In Claude Code, after creating a plan:
+
+```
+/codex-review
+```
+
+Or review a specific file:
+
+```
+/codex-review plans/my-feature-plan.md
+```
+
+### What happens
+
+1. Finds your most recently modified plan file (or uses the one you specify)
+2. Sends it to Codex CLI for architectural review
+3. Presents structured feedback (architecture, risks, suggestions)
+4. Asks if you want to update the plan and re-review
+5. Repeats for up to 3 iterations, then stops for human input
+
+### Direct script usage
+
+```bash
+# Review a plan file
+./scripts/codex-review/codex-review.sh plans/my-plan.md
+
+# Override the model
+./scripts/codex-review/codex-review.sh plans/my-plan.md --model o3-mini
+
+# Via environment variable
+CODEX_REVIEW_MODEL=gpt-4o ./scripts/codex-review/codex-review.sh plans/my-plan.md
+
+# From stdin
+cat plans/my-plan.md | ./scripts/codex-review/codex-review.sh -
+```
+
+### Prerequisites
+
+1. **Codex CLI installed:** `npm install -g @openai/codex`
+2. **OpenAI API key configured:** `codex login` or set `CODEX_API_KEY`
+
+### Codex Review Hook (Optional)
+
+An optional hook that suggests running `/codex-review` when a plan file is modified. Triggers on the `Stop` event.
+
+**To activate:**
+
+```bash
+export CCSETUP_CODEX_REVIEW=1
+```
+
+When unset, the hook is inactive and produces no output.
 
 ## Ralph — Autonomous Agent Loop
 
