@@ -14,6 +14,14 @@ PLAN_FILE=""
 MODEL="${CODEX_REVIEW_MODEL:-}"
 TIMEOUT=120
 
+if command -v timeout &>/dev/null; then
+  TIMEOUT_CMD="timeout"
+elif command -v gtimeout &>/dev/null; then
+  TIMEOUT_CMD="gtimeout"
+else
+  TIMEOUT_CMD=""
+fi
+
 while [[ $# -gt 0 ]]; do
   case $1 in
     --model)
@@ -84,12 +92,16 @@ Plan to review:
 
 $PLAN_CONTENT"
 
-# Run codex exec with timeout
+# Run codex exec with timeout (if available)
 # Temporarily disable exit-on-error to capture the actual exit code before
 # checking it. Using "if ! OUTPUT=$(cmd)" sets $? to 0 inside the then-block
 # (the negated result), making timeout detection (exit 124) impossible.
 set +e
-OUTPUT=$(timeout "${TIMEOUT}s" codex exec $MODEL_FLAG "$REVIEW_PROMPT" 2>&1)
+if [[ -n "$TIMEOUT_CMD" ]]; then
+  OUTPUT=$($TIMEOUT_CMD "${TIMEOUT}s" codex exec $MODEL_FLAG "$REVIEW_PROMPT" 2>&1)
+else
+  OUTPUT=$(codex exec $MODEL_FLAG "$REVIEW_PROMPT" 2>&1)
+fi
 EXIT_CODE=$?
 set -e
 
