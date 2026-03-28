@@ -3,22 +3,12 @@
 const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
-const RepositoryScanner = require('../lib/scanner');
-const ContextGenerator = require('../lib/contextGenerator');
-const ContextMerger = require('../lib/contextMerger');
-const ProgressReporter = require('../lib/progressReporter');
 const TemplateCatalog = require('../lib/templates/catalog');
 const TemplateFilter = require('../lib/templates/filter');
 const TemplateSearch = require('../lib/templates/search');
 
 // Parse CLI arguments
 const args = process.argv.slice(2);
-
-// Handle scan subcommand
-if (args[0] === 'scan') {
-  require('./scan.js');
-  return;
-}
 
 const flags = {
   force: false,
@@ -29,8 +19,6 @@ const flags = {
   agents: false,
   browseAgents: false,
   browse: false,
-  scanContext: false,
-  scanOnly: false,
   prompt: null
 };
 
@@ -55,10 +43,6 @@ for (let i = 0; i < args.length; i++) {
     flags.browseAgents = true;
   } else if (arg === '--browse') {
     flags.browse = true;
-  } else if (arg === '--scan-context') {
-    flags.scanContext = true;
-  } else if (arg === '--scan-only') {
-    flags.scanOnly = true;
   } else if (arg === '--install-hooks') {
     flags.installHooks = true;
   } else if (!arg.startsWith('-')) {
@@ -70,15 +54,12 @@ for (let i = 0; i < args.length; i++) {
 if (flags.help) {
   console.log(`
 Usage: ccsetup [project-name] [options]
-       ccsetup scan [path] [options]
 
 Commands:
-  ccsetup              Interactive mode - choose full setup or scan-only
+  ccsetup              Interactive mode
   ccsetup <name>       Create a new Claude Code project
-  ccsetup scan         Advanced repository scanning (see 'ccsetup scan --help')
 
 Options:
-  --scan-only          Skip project setup, only scan and create/update CLAUDE.md ⭐
   --force, -f          Skip all prompts and overwrite existing files
   --dry-run, -d        Show what would be done without making changes
   --agents             Interactive agent selection mode
@@ -86,32 +67,15 @@ Options:
   --no-agents          Skip agent selection entirely
   --browse-agents      Copy all agents to /agents folder for browsing
   --browse             Enhanced template browsing and selection interface
-  --scan-context       Scan repository and add context to CLAUDE.md
   --help, -h           Show this help message
 
 Advanced:
   --install-hooks      Install workflow selection hook to .claude/hooks (optional, power users only)
 
-Quick Start:
-  npx ccsetup              # Interactive mode - choose what to do
-  npx ccsetup --scan-only  # Just scan and create CLAUDE.md ⭐
-  npx ccsetup my-project   # Full project setup
-
-Scan-Only Mode ⭐:
-  Perfect for existing projects! Analyzes your codebase and creates/updates
-  CLAUDE.md with project context without modifying your project structure.
-  
 Examples:
-  ccsetup --scan-only           # Scan current directory only
-  ccsetup . --scan-only         # Same as above
-  ccsetup --scan-only --force   # Skip confirmation prompts
-  ccsetup --scan-only --dry-run # Preview what would happen
-
-Full Setup Examples:
-  ccsetup                      # Interactive setup in current directory
-  ccsetup my-project           # Create in new directory
-  ccsetup . --scan-context     # Full setup with context scanning
-  ccsetup my-app --all-agents  # Include all agents automatically
+  npx ccsetup              # Interactive setup in current directory
+  npx ccsetup my-project   # Create in new directory
+  npx ccsetup my-app --all-agents  # Include all agents automatically
 `);
   process.exit(0);
 }
@@ -132,202 +96,8 @@ function validateProjectName(name) {
   return true;
 }
 
-async function scanRepositoryForContext(projectPath) {
-  try {
-    const progressReporter = new ProgressReporter();
-    console.log('🔍 Scanning repository for project context...');
-    
-    const scanner = new RepositoryScanner(projectPath);
-    const scanResults = await scanner.scan(progressReporter);
-    
-    const contextGenerator = new ContextGenerator(scanResults);
-    const context = contextGenerator.generate();
-    const structuredSections = contextGenerator.generateStructuredSections();
-    
-    console.log('\n📊 Detected project details:');
-    if (context.overview) {
-      console.log(`   ${context.overview}`);
-    }
-    
-    if (context.techStack && context.techStack.frameworks && context.techStack.frameworks.length > 0) {
-      console.log(`   Framework: ${context.techStack.frameworks.join(', ')}`);
-    }
-    
-    if (context.commands && Object.keys(context.commands).length > 0) {
-      const totalCommands = Object.values(context.commands).reduce((sum, cmds) => sum + cmds.length, 0);
-      console.log(`   Commands: ${totalCommands} available scripts`);
-    }
-    
-    if (context.patterns && Object.keys(context.patterns).length > 0) {
-      const totalPatterns = Object.values(context.patterns).reduce((sum, patterns) => sum + patterns.length, 0);
-      console.log(`   Patterns: ${totalPatterns} detected architectural patterns`);
-    }
-    
-    return {
-      scanResults,
-      contextGenerator,
-      structuredSections,
-      formattedContext: contextGenerator.formatForClaude()
-    };
-  } catch (error) {
-    console.warn(`⚠️  Repository scanning failed: ${error.message}`);
-    console.log('   Continuing with standard setup...\n');
-    return null;
-  }
-}
-
-async function previewAndConfirmContext(formattedContext) {
-  console.log('\n📝 Generated context preview:');
-  console.log('━'.repeat(60));
-  console.log(formattedContext);
-  console.log('━'.repeat(60));
-  
-  // Use inquirer instead of readline prompt
-  const selectModule = await import('@inquirer/select');
-  const select = selectModule.default;
-  const response = await select({
-    message: 'Would you like to add this context to CLAUDE.md?',
-    choices: [
-      { name: 'Yes', value: 'y' },
-      { name: 'No', value: 'n' },
-      { name: 'Edit', value: 'edit' }
-    ],
-    default: 'y'
-  });
-  return response;
-}
-
-async function shouldScanRepository() {
-  console.log('\n🔍 Existing project files detected.');
-  // Use inquirer instead of readline prompt
-  const confirmModule = await import('@inquirer/confirm');
-  const confirm = confirmModule.default;
-  const response = await confirm({
-    message: 'Would you like to scan the repository to add project context to CLAUDE.md?',
-    default: true
-  });
-  return response;
-}
-
-async function mergeContextIntelligently(existingContent, repositoryContext, strategy = 'smart') {
-  try {
-    // Handle replace strategy
-    if (strategy === 'replace') {
-      console.log('   Replacing with new scan results...');
-      // Get template and apply context
-      const templatePath = path.join(__dirname, '..', 'template', 'CLAUDE.md');
-      let template = '';
-      if (fs.existsSync(templatePath)) {
-        template = fs.readFileSync(templatePath, 'utf8');
-      } else {
-        template = `# Claude Code Project Instructions
-
-## Project Overview
-[Project description will be added here]
-
-## Key Objectives
-[Project objectives will be added here]
-
-## Additional Notes
-[Any other important information for Claude to know about this project]
-`;
-      }
-      return await applyContextToTemplate(template, repositoryContext, 'append');
-    }
-    
-    // Use structured sections for intelligent merge, fall back to formatted context
-    let contextToMerge = repositoryContext.formattedContext;
-    
-    if (repositoryContext.structuredSections && 
-        typeof repositoryContext.structuredSections === 'object' && 
-        Object.keys(repositoryContext.structuredSections).length > 0) {
-      contextToMerge = repositoryContext.structuredSections;
-      console.log('   📊 Using intelligent merge with structured sections');
-    } else {
-      console.log('   📝 Using fallback merge with formatted content');
-    }
-    const merger = new ContextMerger(existingContent, contextToMerge);
-    const changes = merger.getChangesSummary();
-    
-    if (!changes.hasChanges) {
-      console.log('   ✅ Context is already up to date');
-      return existingContent;
-    }
-    
-    console.log('\n   📊 Merge Analysis:');
-    if (changes.added > 0) console.log(`     + ${changes.added} new sections`);
-    if (changes.modified > 0) console.log(`     ~ ${changes.modified} updated sections`);
-    if (changes.unchanged > 0) console.log(`     ✓ ${changes.unchanged} preserved sections`);
-    
-    const mergedContent = await merger.merge(strategy);
-    
-    if (typeof mergedContent === 'string') {
-      const existingHeader = merger.extractHeaderContent();
-      return existingHeader + '\n\n' + mergedContent;
-    }
-    
-    return mergedContent;
-  } catch (error) {
-    // Re-throw specific errors that should stop the process
-    if (error.message === 'Interactive merge cancelled' || 
-        error.message === 'Missing required dependency') {
-      throw error;
-    }
-    
-    console.warn(`   ⚠️  Merge failed: ${error.message}`);
-    console.log('   📝 Falling back to simple append...');
-    
-    // Fall back to formatted context for simple append
-    const newContext = repositoryContext.formattedContext;
-    const additionalNotesMarker = '## Additional Notes';
-    const additionalNotesIdx = existingContent.indexOf(additionalNotesMarker);
-    
-    if (additionalNotesIdx === -1) {
-      return existingContent.trimEnd() + '\n\n' + additionalNotesMarker + '\n\n' + newContext.trim() + '\n';
-    } else {
-      const insertIdx = existingContent.indexOf('\n', additionalNotesIdx) + 1;
-      return existingContent.substring(0, insertIdx) + '\n' + newContext.trim() + '\n' + existingContent.substring(insertIdx);
-    }
-  }
-}
-
-async function applyContextToTemplate(templateContent, repositoryContext, conflictStrategy) {
-  const contextContent = repositoryContext.formattedContext;
-  const additionalNotesMarker = '## Additional Notes';
-  const placeholderContent = '[Any other important information for Claude to know about this project]';
-  
-  if (templateContent.includes(additionalNotesMarker)) {
-    if (templateContent.includes(placeholderContent)) {
-      return templateContent.replace(placeholderContent, contextContent.trim());
-    } else {
-      const sections = templateContent.split(additionalNotesMarker);
-      if (sections.length >= 2) {
-        return sections[0] + additionalNotesMarker + contextContent + '\n';
-      }
-    }
-  }
-  
-  return templateContent + contextContent;
-}
-
 // Validate conflicting flags
 function validateFlags() {
-  // Scan-only conflicts
-  if (flags.scanOnly) {
-    const conflictingFlags = [];
-    if (flags.allAgents) conflictingFlags.push('--all-agents');
-    if (flags.noAgents) conflictingFlags.push('--no-agents');
-    if (flags.browseAgents) conflictingFlags.push('--browse-agents');
-    if (flags.browse) conflictingFlags.push('--browse');
-    if (flags.agents) conflictingFlags.push('--agents');
-    
-    if (conflictingFlags.length > 0) {
-      console.error(`Error: --scan-only cannot be used with ${conflictingFlags.join(', ')}`);
-      console.log('Tip: --scan-only skips all agent-related operations');
-      process.exit(1);
-    }
-  }
-  
   // Existing validations
   if (flags.allAgents && flags.noAgents) {
     console.error('Error: Cannot use --all-agents and --no-agents together');
@@ -1044,441 +814,11 @@ async function installClaudeHooks() {
 
 // Setup mode selection function
 async function selectSetupMode() {
-  // Direct flag handling
   if (flags.installHooks) return 'install-hooks';
-  if (flags.scanOnly) return 'scan-only';
   if (flags.agents) return 'agents-only';
-  if (flags.force || flags.browseAgents || flags.allAgents || flags.noAgents) return 'full';
-  
-  // Skip selection if already in a specific mode
-  if (projectName !== '.' || flags.scanContext) return 'full';
-  
-  // Interactive selection for bare 'npx ccsetup'
-  console.log('Welcome to ccsetup! 🎉\n');
-  console.log('This tool helps you set up and maintain your Claude Code project.');
-  console.log('Let\'s analyze your repository and create the perfect CLAUDE.md file.\n');
-  
-  // Check if CLAUDE.md exists to provide context
-  const claudeMdExists = fs.existsSync(path.join(process.cwd(), 'CLAUDE.md'));
-  if (claudeMdExists) {
-    console.log('📋 Existing CLAUDE.md detected in this directory.\n');
-  } else {
-    console.log('📄 No CLAUDE.md found. Let\'s create one!\n');
-  }
-  
-  // Dynamic import for ESM module
-  const selectModule = await import('@inquirer/select');
-  const select = selectModule.default;
-  
-  const mode = await select({
-    message: claudeMdExists ? 
-      'CLAUDE.md exists. How would you like to proceed?' : 
-      'What would you like to do?',
-    choices: claudeMdExists ? [
-      {
-        name: 'Smart Merge - Keep my content, add new findings',
-        value: 'scan-smart',
-        description: 'Preserves your customizations while adding newly detected information'
-      },
-      {
-        name: 'Replace - Fresh scan, replace existing',
-        value: 'scan-replace',
-        description: 'Creates a brand new CLAUDE.md from your current codebase'
-      },
-      {
-        name: 'Full Setup - Add agents and project structure',
-        value: 'full',
-        description: 'Creates the complete Claude Code boilerplate structure with agents, docs, tickets, and plans'
-      }
-    ] : [
-      {
-        name: '🚀 Quick Start - Just create CLAUDE.md',
-        value: 'scan-smart',
-        description: 'Scans your code and creates CLAUDE.md with project context'
-      },
-      {
-        name: '🏗️  Full Setup - Complete Claude Code structure',
-        value: 'full',
-        description: 'Creates CLAUDE.md plus agents, docs, tickets, and plans'
-      }
-    ]
-  });
-  
-  return mode;
+  return 'full';
 }
 
-// Validate scan-only environment
-async function validateScanOnlyEnvironment() {
-  // Check directory exists and is accessible
-  try {
-    await fs.promises.access(targetDir, fs.constants.R_OK | fs.constants.W_OK);
-  } catch (error) {
-    let message = 'Cannot access target directory';
-    let suggestion = 'Check directory permissions';
-    
-    if (error.code === 'ENOENT') {
-      message = 'Target directory does not exist';
-      suggestion = 'Create the directory first or check the path';
-    } else if (error.code === 'EACCES') {
-      message = 'Permission denied accessing target directory';
-      suggestion = 'Run with appropriate permissions or use sudo';
-    } else if (error.code === 'ENOTDIR') {
-      message = 'Target path is not a directory';
-      suggestion = 'Specify a valid directory path';
-    }
-    
-    return {
-      valid: false,
-      message,
-      suggestion
-    };
-  }
-  
-  // Check if CLAUDE.md exists and is writable
-  const claudeMdPath = path.join(targetDir, 'CLAUDE.md');
-  if (fs.existsSync(claudeMdPath)) {
-    try {
-      await fs.promises.access(claudeMdPath, fs.constants.R_OK | fs.constants.W_OK);
-    } catch (error) {
-      return {
-        valid: false,
-        message: 'Cannot access existing CLAUDE.md file',
-        suggestion: 'Check file permissions or run with appropriate access rights'
-      };
-    }
-  }
-  
-  // Check if directory is empty (warning only)
-  const files = await fs.promises.readdir(targetDir);
-  const hasFiles = files.some(f => !f.startsWith('.') && f !== 'node_modules');
-  
-  if (!hasFiles && projectName === '.') {
-    console.log('⚠️  Warning: Current directory appears to be empty.');
-    console.log('   Scan results may be limited.\n');
-  }
-  
-  return { valid: true };
-}
-
-// Get CLAUDE.md template
-async function getClaudeMdTemplate() {
-  const templatePath = path.join(__dirname, '..', 'template', 'CLAUDE.md');
-  try {
-    return await fs.promises.readFile(templatePath, 'utf8');
-  } catch (error) {
-    // Fallback to minimal template
-    return `# Claude Code Project Instructions
-
-## Project Overview
-[Project description will be added here]
-
-## Key Objectives
-[Project objectives will be added here]
-
-## Additional Notes
-[Any other important information for Claude to know about this project]
-`;
-  }
-}
-
-// Scan-only mode implementation
-async function scanOnlyMode(defaultMergeStrategy = 'smart') {
-  console.log('\n🔍 Repository Scan Mode\n');
-  
-  // Provide context based on merge strategy
-  switch (defaultMergeStrategy) {
-    case 'smart':
-      console.log('Smart Merge Mode');
-      console.log('Intelligently merges new findings with your existing CLAUDE.md');
-      console.log('Preserves your customizations while adding newly detected information\n');
-      break;
-    case 'replace':
-      console.log('Replace Mode');
-      console.log('Creates a brand new CLAUDE.md from your current codebase');
-      console.log('Perfect for: Starting fresh or major project restructuring\n');
-      break;
-  }
-  
-  console.log('This will analyze your repository and update CLAUDE.md with:');
-  console.log('  • Project structure and organization');
-  console.log('  • Technology stack and dependencies');
-  console.log('  • Available commands and scripts');
-  console.log('  • Architectural patterns detected');
-  console.log('  • Important context for Claude\n');
-  
-  // Validate environment
-  const validation = await validateScanOnlyEnvironment();
-  if (!validation.valid) {
-    console.error(`❌ ${validation.message}`);
-    if (validation.suggestion) {
-      console.log(`💡 ${validation.suggestion}`);
-    }
-    return;
-  }
-  
-  // Confirmation prompt (unless --force)
-  if (!flags.force && !flags.dryRun) {
-    // Create readline interface if needed
-    if (!rl) {
-      rl = readline.createInterface({
-        input: process.stdin,
-        output: process.stdout
-      });
-    }
-    
-    // Use inquirer instead of readline prompt
-    const confirmModule = await import('@inquirer/confirm');
-    const confirm = confirmModule.default;
-    const shouldContinue = await confirm({
-      message: 'Continue?',
-      default: true
-    });
-    if (!shouldContinue) {
-      console.log('Setup cancelled.');
-      if (rl) rl.close();
-      return;
-    }
-  }
-  
-  // Check if directory has meaningful files
-  const files = await fs.promises.readdir(targetDir);
-  const hasFiles = files.some(f => !f.startsWith('.') && f !== 'node_modules');
-  
-  // Perform repository scan
-  let repositoryContext = null;
-  try {
-    repositoryContext = await scanRepositoryForContext(targetDir);
-  } catch (error) {
-    console.error('❌ Repository scanning failed:', error.message);
-    if (rl) rl.close();
-    return;
-  }
-  
-  if (!repositoryContext) {
-    // Handle empty directory case
-    if (!hasFiles && projectName === '.') {
-      console.log('📝 Since the directory is empty, would you like to:');
-      console.log('1) Create a minimal CLAUDE.md with basic template');
-      console.log('2) Cancel and run full setup instead');
-      
-      // Use inquirer instead of readline prompt
-      const selectModule = await import('@inquirer/select');
-      const select = selectModule.default;
-      const choice = await select({
-        message: 'Choose an option:',
-        choices: [
-          { name: '1) Continue with minimal context', value: '1' },
-          { name: '2) Cancel and run full setup instead', value: '2' }
-        ]
-      });
-      
-      if (choice === '2') {
-        console.log('\n💡 Run `npx ccsetup` without --scan-only for full project setup.');
-        if (rl) rl.close();
-        return;
-      }
-      
-      // Continue with minimal context
-      repositoryContext = {
-        formattedContext: `
-## Additional Notes
-
-This project directory was empty when scanned. 
-Please update this file with relevant project information as you develop.
-
-### Getting Started
-- Add project description above
-- Define key objectives
-- Document important conventions
-- Update as the project evolves
-`
-      };
-    } else {
-      console.log('❌ Unable to generate context from repository.');
-      console.log('💡 Tip: Make sure you\'re in a valid project directory.');
-      if (rl) rl.close();
-      return;
-    }
-  }
-  
-  // Preview and confirm context
-  if (!flags.force && !flags.dryRun) {
-    const confirmResult = await previewAndConfirmContext(repositoryContext.formattedContext);
-    if (confirmResult === 'n' || confirmResult === 'no') {
-      console.log('✅ Setup cancelled.');
-      if (rl) rl.close();
-      return;
-    }
-  }
-  
-  // Handle CLAUDE.md creation/update
-  const claudeMdPath = path.join(targetDir, 'CLAUDE.md');
-  const exists = fs.existsSync(claudeMdPath);
-  let backupPath = null;
-  let mergeStrategy = 'smart'; // Default merge strategy
-  
-  try {
-    if (exists) {
-      // Update existing CLAUDE.md
-      if (!flags.force && !flags.dryRun) {
-        console.log('\n📋 Existing CLAUDE.md detected!');
-        
-        // Use the default merge strategy if provided
-        if (defaultMergeStrategy === 'replace') {
-          console.log('This will replace your existing CLAUDE.md with a fresh scan.');
-          console.log('   Your current content will be backed up first.');
-          const confirmModule = await import('@inquirer/confirm');
-          const confirm = confirmModule.default;
-          const shouldProceed = await confirm({
-            message: 'Proceed with replacement?',
-            default: false
-          });
-          if (!shouldProceed) {
-            console.log('Cancelled.');
-            if (rl) rl.close();
-            return;
-          }
-          mergeStrategy = 'replace';
-        } else {
-          console.log('The scan will:');
-          console.log('  • Preserve all your existing content');
-          console.log('  • Add new findings from the scan');
-          console.log('  • Create an automatic backup');
-
-          const confirmModule = await import('@inquirer/confirm');
-          const confirm = confirmModule.default;
-          const shouldContinue = await confirm({
-            message: 'Continue with smart merge?',
-            default: true
-          });
-          if (!shouldContinue) {
-            console.log('Update cancelled.');
-            if (rl) rl.close();
-            return;
-          }
-          mergeStrategy = 'smart';
-        }
-      } else {
-        mergeStrategy = defaultMergeStrategy;
-      }
-      
-      console.log('\n📄 Updating existing CLAUDE.md...');
-      
-      if (!flags.dryRun) {
-        // Check file size before processing
-        const stats = fs.statSync(claudeMdPath);
-        if (stats.size > 1024 * 1024) { // 1MB
-          console.warn('⚠️  Warning: CLAUDE.md is large (>1MB). Processing may take longer.');
-        }
-        
-        let existingContent;
-        try {
-          existingContent = fs.readFileSync(claudeMdPath, 'utf8');
-        } catch (error) {
-          throw new Error(`Failed to read existing CLAUDE.md: ${error.message}`);
-        }
-        
-        // Validate content
-        if (!existingContent) {
-          console.warn('⚠️  Warning: Existing CLAUDE.md appears to be empty.');
-        }
-        
-        // Create backup first
-        backupPath = `${claudeMdPath}.backup.${Date.now()}`;
-        try {
-          fs.writeFileSync(backupPath, existingContent);
-          console.log(`📦 Backup created: ${path.basename(backupPath)}`);
-        } catch (error) {
-          throw new Error(`Failed to create backup: ${error.message}`);
-        }
-        
-        // Use intelligent merge with backup
-        let updatedContent;
-        try {
-          updatedContent = await mergeContextIntelligently(existingContent, repositoryContext, mergeStrategy);
-        } catch (mergeError) {
-          if (mergeError.message === 'Interactive merge cancelled') {
-            console.log('💾 Your original CLAUDE.md is unchanged.');
-            console.log(`📦 Scan results backup: ${path.basename(backupPath)}`);
-            if (rl) rl.close();
-            return;
-          } else if (mergeError.message === 'Missing required dependency') {
-            console.error('Please install missing dependencies and try again.');
-            if (rl) rl.close();
-            return;
-          }
-          throw mergeError;
-        }
-        
-        try {
-          fs.writeFileSync(claudeMdPath, updatedContent, 'utf8');
-        } catch (error) {
-          // Restore from backup if write fails
-          try {
-            fs.writeFileSync(claudeMdPath, existingContent, 'utf8');
-            console.error('❌ Failed to update CLAUDE.md. Original content restored.');
-          } catch (restoreError) {
-            console.error('❌ Critical: Failed to update AND restore CLAUDE.md!');
-            console.error(`💾 Your content is safe in: ${path.basename(backupPath)}`);
-          }
-          throw new Error(`Failed to write updated content: ${error.message}`);
-        }
-        
-        console.log('✅ CLAUDE.md updated successfully!\n');
-        
-        // Provide feedback based on merge strategy used
-        if (mergeStrategy === 'smart') {
-          console.log('   Smart merge completed');
-          console.log('   - Your customizations preserved');
-          console.log('   - New findings integrated');
-        } else if (mergeStrategy === 'replace') {
-          console.log('   Replace completed');
-          console.log('   - New CLAUDE.md generated from current codebase');
-        }
-        
-        console.log(`   📦 Backup saved: ${path.basename(backupPath)}`);
-        console.log('   💡 Review the updated content and delete backup when satisfied');
-      } else {
-        console.log('  Would update: CLAUDE.md (dry-run mode)');
-      }
-    } else {
-      // Create new CLAUDE.md
-      console.log('\n📄 Creating CLAUDE.md...');
-      
-      if (!flags.dryRun) {
-        const template = await getClaudeMdTemplate();
-        const enhanced = await applyContextToTemplate(template, repositoryContext, 'append');
-        fs.writeFileSync(claudeMdPath, enhanced, 'utf8');
-        console.log('✅ CLAUDE.md created with project context!');
-      } else {
-        console.log('  Would create: CLAUDE.md (dry-run mode)');
-      }
-    }
-    
-    // Show next steps
-    console.log('\nNext steps:');
-    console.log('1. Review the updated Additional Notes section in CLAUDE.md');
-    console.log('2. Move any important context to appropriate sections');
-    if (exists && backupPath && !flags.dryRun) {
-      console.log(`3. Delete the backup file once satisfied: ${path.basename(backupPath)}`);
-      console.log('4. Run `ccsetup scan` anytime to refresh context');
-    } else if (exists) {
-      console.log('3. Run `ccsetup scan` anytime to refresh context');
-    } else {
-      console.log('3. Add project-specific instructions and guidelines');
-      console.log('4. Run `npx ccsetup` for full setup if you need agents and project structure');
-      console.log('5. Run `ccsetup scan` anytime to refresh context');
-    }
-    
-  } catch (error) {
-    console.error('❌ Error handling CLAUDE.md:', error.message);
-    if (exists && !flags.dryRun) {
-      console.log('💡 Your original CLAUDE.md is safe. Check for backup files if needed.');
-    }
-  } finally {
-    if (rl) rl.close();
-  }
-}
 
 // Dynamic import for ESM module
 async function importCheckbox() {
@@ -1893,25 +1233,6 @@ async function main() {
       return;
     }
     
-    if (setupMode === 'scan-only' || setupMode === 'scan-smart' || setupMode === 'scan-replace') {
-      // Close readline if open
-      if (rl) {
-        rl.close();
-        rl = null;
-      }
-
-      // Set appropriate flags based on mode
-      flags.scanOnly = true;
-      if (setupMode === 'scan-replace') {
-        flags.mergeStrategy = 'replace';
-      } else {
-        flags.mergeStrategy = 'smart';
-      }
-      
-      await scanOnlyMode(flags.mergeStrategy);
-      return;
-    }
-
     // Handle --agents and --browse flags for agent selection only
     if (flags.agents || flags.browse) {
       console.log('🤖 Interactive Agent Selection\n');
@@ -2161,7 +1482,7 @@ async function main() {
     // In dry-run mode, show what would happen
     console.log(`\nWould prompt for agent selection mode`);
     console.log(`Would then prompt for agent selection from ${availableAgents.length} available agents`);
-    selectedAgentFiles = availableAgents.map(a => a.file).filter(validateAgentFile); // Include all for scanning purposes
+    selectedAgentFiles = availableAgents.map(a => a.file).filter(validateAgentFile); // Include all for dry-run preview
   }
 
   function scanTemplate(src, dest, relativePath = '', skipAgents = false) {
@@ -2326,29 +1647,6 @@ async function main() {
 
   scanTemplate(templateDir, targetDir, '', true);
 
-  // Handle repository scanning for context
-  let repositoryContext = null;
-  if (flags.scanContext || (!flags.dryRun && projectName === '.' && !flags.force)) {
-    const hasExistingFiles = allItems.some(item => item.exists);
-    
-    if (hasExistingFiles || flags.scanContext) {
-      if (flags.scanContext || (!flags.force && await shouldScanRepository())) {
-        repositoryContext = await scanRepositoryForContext(targetDir);
-        
-        if (repositoryContext && !flags.dryRun) {
-          const confirmResult = await previewAndConfirmContext(repositoryContext.formattedContext);
-          
-          if (confirmResult === 'n' || confirmResult === 'no') {
-            repositoryContext = null;
-            console.log('✅ Skipping context addition to CLAUDE.md');
-          } else if (confirmResult === 'edit') {
-            console.log('📝 Context editing not yet implemented. Using generated context as-is.');
-          }
-        }
-      }
-    }
-  }
-
   // Handle force flag
   if (flags.force) {
     // Set all strategies to overwrite
@@ -2481,26 +1779,10 @@ async function main() {
             console.log(`  📄 ${flags.dryRun ? 'Would create' : 'Created'}: ${path.relative(targetDir, newDest)}`);
           } else if (strategy === 'overwrite') {
             if (!flags.dryRun) {
-              // Handle CLAUDE.md with context injection on overwrite
-              if (item.relativePath === 'CLAUDE.md' && repositoryContext) {
-                const templateContent = fs.readFileSync(item.src, 'utf8');
-                const enhancedContent = await applyContextToTemplate(
-                  templateContent, 
-                  repositoryContext,
-                  'append'
-                );
-                fs.writeFileSync(item.dest, enhancedContent, 'utf8');
-                console.log(`  ♻️  Replaced CLAUDE.md with project context`);
-              } else {
-                fs.copyFileSync(item.src, item.dest);
-                console.log(`  ♻️  Replaced: ${item.relativePath}`);
-              }
+              fs.copyFileSync(item.src, item.dest);
+              console.log(`  ♻️  Replaced: ${item.relativePath}`);
             } else {
-              if (item.relativePath === 'CLAUDE.md' && repositoryContext) {
-                console.log(`  ♻️  Would replace: ${item.relativePath} (with project context)`);
-              } else {
-                console.log(`  ♻️  Would replace: ${item.relativePath}`);
-              }
+              console.log(`  ♻️  Would replace: ${item.relativePath}`);
             }
             overwrittenCount++;
           }
@@ -2512,25 +1794,9 @@ async function main() {
               fs.mkdirSync(destDir, { recursive: true });
             }
             
-            // Handle CLAUDE.md with context injection
-            if (item.relativePath === 'CLAUDE.md' && repositoryContext) {
-              const templateContent = fs.readFileSync(item.src, 'utf8');
-              const enhancedContent = await applyContextToTemplate(
-                templateContent, 
-                repositoryContext,
-                'append'
-              );
-              fs.writeFileSync(item.dest, enhancedContent, 'utf8');
-              console.log(`  ✨ Created CLAUDE.md with project context`);
-            } else {
-              fs.copyFileSync(item.src, item.dest);
-            }
+            fs.copyFileSync(item.src, item.dest);
           } else {
-            if (item.relativePath === 'CLAUDE.md' && repositoryContext) {
-              console.log(`  ✨ Would copy: ${item.relativePath} (with project context)`);
-            } else {
-              console.log(`  ✨ Would copy: ${item.relativePath}`);
-            }
+            console.log(`  ✨ Would copy: ${item.relativePath}`);
           }
           copiedCount++;
         }
@@ -2583,9 +1849,6 @@ async function main() {
     }
     if (claudeInitResult && claudeInitResult.createdItems.length > 0) {
       console.log(`  📁 ${claudeInitResult.createdItems.length} items created in .claude directory`);
-    }
-    if (repositoryContext && !flags.dryRun) {
-      console.log(`  🔍 Project context automatically added to CLAUDE.md`);
     }
   }
   

@@ -57,25 +57,11 @@ backend, blockchain, checker, coder, frontend, planner, researcher, shadcn
 npx ccsetup my-project --agents        # Interactive agent selection
 npx ccsetup my-project --all-agents    # Include all agents
 npx ccsetup my-project --no-agents     # Skip agent selection entirely
-npx ccsetup . --scan-context           # Scan existing project for context
-npx ccsetup --scan-only                # Only scan and update CLAUDE.md
 npx ccsetup my-project --dry-run       # Preview without creating files
 npx ccsetup my-project --force         # Skip prompts, overwrite existing
 npx ccsetup my-project --browse        # Enhanced template browsing UI
 npx ccsetup --install-hooks            # Install workflow selection hooks (advanced)
 ```
-
-### Repository Scanning
-
-Scan existing projects to auto-generate CLAUDE.md context:
-
-```bash
-ccsetup scan                           # Scan current directory
-ccsetup scan --update                  # Update existing CLAUDE.md
-ccsetup scan --update --merge-strategy replace       # Replace CLAUDE.md entirely
-```
-
-Detects languages, frameworks, project structure, and commands from package.json/Makefile/Docker Compose.
 
 ## Agent Workflows
 

@@ -66,7 +66,6 @@ describe('CLI Help & Flag Parsing', () => {
   test('--help shows usage information', () => {
     const output = run('--help');
     expect(output).toContain('Usage: ccsetup');
-    expect(output).toContain('--scan-only');
     expect(output).toContain('--force');
     expect(output).toContain('--dry-run');
     expect(output).toContain('--agents');
@@ -79,11 +78,6 @@ describe('CLI Help & Flag Parsing', () => {
     }).toThrow();
   });
 
-  test('conflicting flags --scan-only and --all-agents exits with error', () => {
-    expect(() => {
-      run('--scan-only --all-agents', { stdio: 'pipe' });
-    }).toThrow();
-  });
 });
 
 describe('Project Name Validation', () => {
@@ -143,15 +137,6 @@ describe('Project Creation (--force)', () => {
         .filter(f => f.endsWith('.md') && f !== 'README.md');
       expect(agents).toHaveLength(0);
     }
-  });
-});
-
-describe('Scan Subcommand', () => {
-  test('scan --help shows scan-specific usage', () => {
-    const output = run('scan --help');
-    expect(output).toContain('--update');
-    expect(output).toContain('--merge-strategy');
-    expect(output).toContain('--dry-run');
   });
 });
 
