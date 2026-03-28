@@ -64,7 +64,7 @@ describe('Script Prerequisite Checking', () => {
       writeFakeExec(path.join(tmpDir, 'codex'), 'echo "ok"; exit 0');
       const result = spawnSync('bash', [SCRIPT_PATH], {
         cwd: tmpDir,
-        env: { ...process.env, PATH: `${tmpDir}:${process.env.PATH}`, OPENAI_API_KEY: 'test-key' },
+        env: { ...process.env, PATH: `${tmpDir}:${process.env.PATH}` },
         encoding: 'utf8',
       });
       expect(result.status).toBe(1);
@@ -79,7 +79,7 @@ describe('Script Prerequisite Checking', () => {
     try {
       writeFakeExec(path.join(tmpDir, 'codex'), 'echo "ok"; exit 0');
       const result = spawnSync('bash', [SCRIPT_PATH, '/tmp/no-such-plan-file.md'], {
-        env: { ...process.env, PATH: `${tmpDir}:${process.env.PATH}`, OPENAI_API_KEY: 'test-key' },
+        env: { ...process.env, PATH: `${tmpDir}:${process.env.PATH}` },
         encoding: 'utf8',
       });
       expect(result.status).toBe(1);
@@ -99,7 +99,7 @@ describe('Script Prerequisite Checking', () => {
       writeFakeExec(path.join(tmpDir, 'codex'), 'echo "review output"; exit 0');
 
       const result = spawnSync('bash', [SCRIPT_PATH, planFile, '--model', 'o3-mini'], {
-        env: { ...process.env, PATH: `${tmpDir}:${process.env.PATH}`, OPENAI_API_KEY: 'test-key' },
+        env: { ...process.env, PATH: `${tmpDir}:${process.env.PATH}` },
         encoding: 'utf8',
       });
       expect(result.status).toBe(0);
@@ -354,7 +354,7 @@ describe('Script Error Handling', () => {
       );
 
       const result = spawnSync('bash', [SCRIPT_PATH, planFile], {
-        env: { ...process.env, PATH: `${tmpDir}:${process.env.PATH}`, OPENAI_API_KEY: 'test-key' },
+        env: { ...process.env, PATH: `${tmpDir}:${process.env.PATH}` },
         encoding: 'utf8',
       });
       expect(result.status).toBe(2);
@@ -374,7 +374,7 @@ describe('Script Error Handling', () => {
       writeFakeExec(path.join(tmpDir, 'timeout'), 'exit 124');
 
       const result = spawnSync('bash', [SCRIPT_PATH, planFile], {
-        env: { ...process.env, PATH: `${tmpDir}:${process.env.PATH}`, OPENAI_API_KEY: 'test-key' },
+        env: { ...process.env, PATH: `${tmpDir}:${process.env.PATH}` },
         encoding: 'utf8',
       });
       expect(result.status).toBe(3);
@@ -409,7 +409,7 @@ describe('Script Auto-Detection (plan + git diff)', () => {
 
       const result = spawnSync('bash', [SCRIPT_PATH], {
         cwd: tmpDir,
-        env: { ...process.env, PATH: `${tmpDir}:${process.env.PATH}`, OPENAI_API_KEY: 'test-key' },
+        env: { ...process.env, PATH: `${tmpDir}:${process.env.PATH}` },
         encoding: 'utf8',
       });
       expect(result.status).toBe(0);
@@ -429,7 +429,7 @@ describe('Script Auto-Detection (plan + git diff)', () => {
 
       const result = spawnSync('bash', [SCRIPT_PATH, planFile], {
         cwd: tmpDir,
-        env: { ...process.env, PATH: `${tmpDir}:${process.env.PATH}`, OPENAI_API_KEY: 'test-key' },
+        env: { ...process.env, PATH: `${tmpDir}:${process.env.PATH}` },
         encoding: 'utf8',
       });
       expect(result.status).toBe(0);
@@ -449,7 +449,7 @@ describe('Script Auto-Detection (plan + git diff)', () => {
 
       const result = spawnSync('bash', [SCRIPT_PATH, planFile], {
         cwd: tmpDir,
-        env: { ...process.env, PATH: `${tmpDir}:${process.env.PATH}`, OPENAI_API_KEY: 'test-key' },
+        env: { ...process.env, PATH: `${tmpDir}:${process.env.PATH}` },
         encoding: 'utf8',
       });
       expect(result.status).toBe(0);
@@ -466,7 +466,7 @@ describe('Script Auto-Detection (plan + git diff)', () => {
 
       const result = spawnSync('bash', [SCRIPT_PATH], {
         cwd: tmpDir,
-        env: { ...process.env, PATH: `${tmpDir}:${process.env.PATH}`, OPENAI_API_KEY: 'test-key' },
+        env: { ...process.env, PATH: `${tmpDir}:${process.env.PATH}` },
         encoding: 'utf8',
       });
       expect(result.status).toBe(1);

@@ -56,12 +56,6 @@ if ! command -v codex &>/dev/null; then
   exit 1
 fi
 
-if [[ -z "${OPENAI_API_KEY:-}" ]]; then
-  echo "Error: OPENAI_API_KEY is not set. Export it or add it to your shell profile." >&2
-  echo "  export OPENAI_API_KEY=sk-..." >&2
-  exit 2
-fi
-
 # Read plan content (optional — only when a plan file is provided)
 if [[ "$PLAN_FILE" == "-" ]]; then
   PLAN_CONTENT=$(cat)
