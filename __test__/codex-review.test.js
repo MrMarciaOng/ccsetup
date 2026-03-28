@@ -57,16 +57,18 @@ describe('Script Prerequisite Checking', () => {
     }
   });
 
-  test('exits with code 1 when plan file argument is missing', () => {
-    const tmpDir = makeTempDir();
+  test('exits with code 1 when no plan file and no git changes', () => {
+    // Use a clean git repo so the parent repo's changes don't leak in
+    const tmpDir = makeGitRepo({ withChanges: false });
     try {
       writeFakeExec(path.join(tmpDir, 'codex'), 'echo "ok"; exit 0');
       const result = spawnSync('bash', [SCRIPT_PATH], {
-        env: { ...process.env, PATH: `${tmpDir}:${process.env.PATH}` },
+        cwd: tmpDir,
+        env: { ...process.env, PATH: `${tmpDir}:${process.env.PATH}`, OPENAI_API_KEY: 'test-key' },
         encoding: 'utf8',
       });
       expect(result.status).toBe(1);
-      expect(result.stderr).toMatch(/No plan file/i);
+      expect(result.stderr).toMatch(/nothing to review/i);
     } finally {
       cleanup(tmpDir);
     }
@@ -77,11 +79,11 @@ describe('Script Prerequisite Checking', () => {
     try {
       writeFakeExec(path.join(tmpDir, 'codex'), 'echo "ok"; exit 0');
       const result = spawnSync('bash', [SCRIPT_PATH, '/tmp/no-such-plan-file.md'], {
-        env: { ...process.env, PATH: `${tmpDir}:${process.env.PATH}` },
+        env: { ...process.env, PATH: `${tmpDir}:${process.env.PATH}`, OPENAI_API_KEY: 'test-key' },
         encoding: 'utf8',
       });
       expect(result.status).toBe(1);
-      expect(result.stderr).toMatch(/No plan file|not found/i);
+      expect(result.stderr).toMatch(/not found/i);
     } finally {
       cleanup(tmpDir);
     }
@@ -97,7 +99,7 @@ describe('Script Prerequisite Checking', () => {
       writeFakeExec(path.join(tmpDir, 'codex'), 'echo "review output"; exit 0');
 
       const result = spawnSync('bash', [SCRIPT_PATH, planFile, '--model', 'o3-mini'], {
-        env: { ...process.env, PATH: `${tmpDir}:${process.env.PATH}` },
+        env: { ...process.env, PATH: `${tmpDir}:${process.env.PATH}`, OPENAI_API_KEY: 'test-key' },
         encoding: 'utf8',
       });
       expect(result.status).toBe(0);
@@ -119,6 +121,7 @@ describe('Script Prerequisite Checking', () => {
         env: {
           ...process.env,
           PATH: `${tmpDir}:${process.env.PATH}`,
+          OPENAI_API_KEY: 'test-key',
           CODEX_REVIEW_MODEL: 'gpt-4o',
         },
         encoding: 'utf8',
@@ -159,8 +162,9 @@ describe('Hook Plan Detection Logic', () => {
     }
   });
 
-  test('outputs {} when no recent plan files exist', () => {
-    const tmpDir = makeTempDir();
+  test('outputs {} when no recent plan files and no git changes exist', () => {
+    // Use a clean git repo so the parent repo's changes don't leak in
+    const tmpDir = makeGitRepo({ withChanges: false });
     try {
       const result = runHook(tmpDir, { CCSETUP_CODEX_REVIEW: '1' });
       expect(result.status).toBe(0);
@@ -206,7 +210,8 @@ describe('Hook Plan Detection Logic', () => {
   });
 
   test('ignores non-plan .md files in root directory', () => {
-    const tmpDir = makeTempDir();
+    // Use a clean git repo so the parent repo's changes don't leak in
+    const tmpDir = makeGitRepo({ withChanges: false });
     try {
       fs.writeFileSync(path.join(tmpDir, 'README.md'), '# Readme');
 
@@ -349,7 +354,7 @@ describe('Script Error Handling', () => {
       );
 
       const result = spawnSync('bash', [SCRIPT_PATH, planFile], {
-        env: { ...process.env, PATH: `${tmpDir}:${process.env.PATH}` },
+        env: { ...process.env, PATH: `${tmpDir}:${process.env.PATH}`, OPENAI_API_KEY: 'test-key' },
         encoding: 'utf8',
       });
       expect(result.status).toBe(2);
@@ -369,7 +374,7 @@ describe('Script Error Handling', () => {
       writeFakeExec(path.join(tmpDir, 'timeout'), 'exit 124');
 
       const result = spawnSync('bash', [SCRIPT_PATH, planFile], {
-        env: { ...process.env, PATH: `${tmpDir}:${process.env.PATH}` },
+        env: { ...process.env, PATH: `${tmpDir}:${process.env.PATH}`, OPENAI_API_KEY: 'test-key' },
         encoding: 'utf8',
       });
       expect(result.status).toBe(3);
@@ -377,5 +382,166 @@ describe('Script Error Handling', () => {
     } finally {
       cleanup(tmpDir);
     }
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Helper: create a temp git repo with an initial commit and optional uncommitted change
+function makeGitRepo({ withChanges = false } = {}) {
+  const tmpDir = makeTempDir();
+  execSync('git init', { cwd: tmpDir, stdio: 'pipe' });
+  execSync('git config user.email "test@test.com"', { cwd: tmpDir, stdio: 'pipe' });
+  execSync('git config user.name "Test"', { cwd: tmpDir, stdio: 'pipe' });
+  fs.writeFileSync(path.join(tmpDir, 'file.txt'), 'initial content');
+  execSync('git add . && git commit -m "init"', { cwd: tmpDir, stdio: 'pipe' });
+  if (withChanges) {
+    fs.writeFileSync(path.join(tmpDir, 'file.txt'), 'modified content');
+  }
+  return tmpDir;
+}
+
+describe('Script Auto-Detection (plan + git diff)', () => {
+  test('code review mode: no plan + git changes → exit 0', () => {
+    const tmpDir = makeGitRepo({ withChanges: true });
+    try {
+      writeFakeExec(path.join(tmpDir, 'codex'), 'echo "code review output"; exit 0');
+      writeFakeExec(path.join(tmpDir, 'timeout'), 'shift; exec "$@"');
+
+      const result = spawnSync('bash', [SCRIPT_PATH], {
+        cwd: tmpDir,
+        env: { ...process.env, PATH: `${tmpDir}:${process.env.PATH}`, OPENAI_API_KEY: 'test-key' },
+        encoding: 'utf8',
+      });
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('code review output');
+    } finally {
+      cleanup(tmpDir);
+    }
+  });
+
+  test('implementation review mode: plan + git changes → exit 0', () => {
+    const tmpDir = makeGitRepo({ withChanges: true });
+    try {
+      const planFile = path.join(tmpDir, 'plan.md');
+      fs.writeFileSync(planFile, '# My Plan\n## Acceptance Criteria\n- Do the thing');
+      writeFakeExec(path.join(tmpDir, 'codex'), 'echo "implementation review output"; exit 0');
+      writeFakeExec(path.join(tmpDir, 'timeout'), 'shift; exec "$@"');
+
+      const result = spawnSync('bash', [SCRIPT_PATH, planFile], {
+        cwd: tmpDir,
+        env: { ...process.env, PATH: `${tmpDir}:${process.env.PATH}`, OPENAI_API_KEY: 'test-key' },
+        encoding: 'utf8',
+      });
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('implementation review output');
+    } finally {
+      cleanup(tmpDir);
+    }
+  });
+
+  test('plan review mode: plan + no git changes → exit 0', () => {
+    const tmpDir = makeGitRepo({ withChanges: false });
+    try {
+      const planFile = path.join(tmpDir, 'plan.md');
+      fs.writeFileSync(planFile, '# My Plan');
+      writeFakeExec(path.join(tmpDir, 'codex'), 'echo "plan review output"; exit 0');
+      writeFakeExec(path.join(tmpDir, 'timeout'), 'shift; exec "$@"');
+
+      const result = spawnSync('bash', [SCRIPT_PATH, planFile], {
+        cwd: tmpDir,
+        env: { ...process.env, PATH: `${tmpDir}:${process.env.PATH}`, OPENAI_API_KEY: 'test-key' },
+        encoding: 'utf8',
+      });
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('plan review output');
+    } finally {
+      cleanup(tmpDir);
+    }
+  });
+
+  test('exits 1 when no plan and no git repo', () => {
+    const tmpDir = makeTempDir();
+    try {
+      writeFakeExec(path.join(tmpDir, 'codex'), 'echo "ok"; exit 0');
+
+      const result = spawnSync('bash', [SCRIPT_PATH], {
+        cwd: tmpDir,
+        env: { ...process.env, PATH: `${tmpDir}:${process.env.PATH}`, OPENAI_API_KEY: 'test-key' },
+        encoding: 'utf8',
+      });
+      expect(result.status).toBe(1);
+      expect(result.stderr).toMatch(/nothing to review/i);
+    } finally {
+      cleanup(tmpDir);
+    }
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe('Hook Suggestion Modes', () => {
+  test('suggests implementation review when plan + git changes exist', () => {
+    const tmpDir = makeGitRepo({ withChanges: true });
+    try {
+      const plansDir = path.join(tmpDir, 'plans');
+      fs.mkdirSync(plansDir);
+      fs.writeFileSync(path.join(plansDir, 'my-plan.md'), '# Plan');
+
+      const result = runHook(tmpDir, { CCSETUP_CODEX_REVIEW: '1' });
+      expect(result.status).toBe(0);
+
+      const output = JSON.parse(result.stdout.trim());
+      expect(output).toHaveProperty('message');
+      expect(output.message).toMatch(/validate/i);
+      expect(output.message).toContain('my-plan.md');
+    } finally {
+      cleanup(tmpDir);
+    }
+  });
+
+  test('suggests code review when only git changes exist (no plan)', () => {
+    const tmpDir = makeGitRepo({ withChanges: true });
+    try {
+      const result = runHook(tmpDir, { CCSETUP_CODEX_REVIEW: '1' });
+      expect(result.status).toBe(0);
+
+      const output = JSON.parse(result.stdout.trim());
+      expect(output).toHaveProperty('message');
+      expect(output.message).toMatch(/code review/i);
+    } finally {
+      cleanup(tmpDir);
+    }
+  });
+
+  test('suggests plan review when only plan exists (no git changes)', () => {
+    const tmpDir = makeGitRepo({ withChanges: false });
+    try {
+      const plansDir = path.join(tmpDir, 'plans');
+      fs.mkdirSync(plansDir);
+      fs.writeFileSync(path.join(plansDir, 'my-plan.md'), '# Plan');
+
+      const result = runHook(tmpDir, { CCSETUP_CODEX_REVIEW: '1' });
+      expect(result.status).toBe(0);
+
+      const output = JSON.parse(result.stdout.trim());
+      expect(output).toHaveProperty('message');
+      expect(output.message).toMatch(/second opinion/i);
+    } finally {
+      cleanup(tmpDir);
+    }
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe('Skill File Validation (updated)', () => {
+  test('skill documents all three review modes', () => {
+    const content = fs.readFileSync(SKILL_PATH, 'utf8').toLowerCase();
+    expect(content).toContain('plan review');
+    expect(content).toContain('implementation review');
+    expect(content).toContain('code review');
+  });
+
+  test('skill documents auto-detection behavior', () => {
+    const content = fs.readFileSync(SKILL_PATH, 'utf8').toLowerCase();
+    expect(content).toContain('auto-detect');
   });
 });

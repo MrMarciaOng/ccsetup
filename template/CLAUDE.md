@@ -22,7 +22,7 @@
 ├── agents/            # Documentation only — see .claude/agents/ for active agents
 ├── scripts/
 │   ├── ralph/         # Autonomous agent loop (ralph.sh + agent instructions)
-│   └── codex-review/  # Codex CLI architectural review script
+│   └── codex-review/  # Codex CLI review script (plans, implementations, code changes)
 ├── docs/              # Project documentation
 ├── plans/             # Project plans and architectural documents
 └── tickets/           # Task tickets and issues
@@ -69,7 +69,7 @@
 
 - **/prd** — Scans the codebase, then generates a structured PRD with real file paths and auto-detected quality criteria. Saves to `tasks/prd-[feature-name].md`.
 - **/ralph** — Converts a PRD into `scripts/ralph/prd.json` for autonomous execution with quality checks and file hints per story.
-- **/codex-review** — Gets a second-opinion architectural review of a plan file from Codex CLI. Iterates up to 3 times, refining the plan based on feedback.
+- **/codex-review** — Reviews plans, validates implementations against plans, or reviews code changes. Auto-detects what to review based on context. Iterates up to 3 times.
 
 ## Ralph — Autonomous Agent Loop
 
@@ -100,7 +100,7 @@ When unset, the hook is inactive and Claude uses its default behavior. Install t
 
 ## Codex Review Hook (Optional)
 
-An optional hook that suggests running `/codex-review` when a plan file is modified. Triggers on the `Stop` event.
+An optional hook that suggests running `/codex-review` when a plan file is modified or code changes are detected. Triggers on the `Stop` event.
 
 To activate:
 ```bash

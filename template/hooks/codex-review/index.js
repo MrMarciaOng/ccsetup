@@ -2,6 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { execSync } = require('child_process');
 
 // Environment variable toggle — exit early if not enabled
 // Enable with: export CCSETUP_CODEX_REVIEW=1
@@ -57,6 +58,17 @@ function findRecentlyModifiedPlans() {
   return recentPlans;
 }
 
+function hasGitChanges() {
+  try {
+    execSync('git diff HEAD --quiet', { stdio: 'pipe' });
+    return false;
+  } catch (err) {
+    // Exit code 1 = diff found changes; other codes = command failed (e.g., no HEAD, not a repo)
+    if (err.status === 1) return true;
+    return false;
+  }
+}
+
 // Main — reads from stdin as Claude Code provides
 let inputData = '';
 
@@ -67,16 +79,24 @@ process.stdin.on('data', (chunk) => {
 process.stdin.on('end', () => {
   try {
     const recentPlans = findRecentlyModifiedPlans();
+    const gitChanges = hasGitChanges();
+    let output = {};
 
-    if (recentPlans.length === 0) {
-      console.log('{}');
-      return;
+    if (recentPlans.length > 0 && gitChanges) {
+      const planNames = recentPlans.map(p => path.basename(p)).join(', ');
+      output = {
+        message: `Plan updated with code changes. Run /codex-review to validate implementation. (${planNames})`
+      };
+    } else if (recentPlans.length > 0) {
+      const planNames = recentPlans.map(p => path.basename(p)).join(', ');
+      output = {
+        message: `Plan created. Run /codex-review for a second opinion from Codex CLI. (${planNames})`
+      };
+    } else if (gitChanges) {
+      output = {
+        message: `Code changes detected. Run /codex-review for a code review from Codex CLI.`
+      };
     }
-
-    const planNames = recentPlans.map(p => path.basename(p)).join(', ');
-    const output = {
-      message: `Plan created. Run /codex-review for a second opinion from Codex CLI. (${planNames})`
-    };
 
     console.log(JSON.stringify(output));
   } catch (error) {
