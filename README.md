@@ -49,7 +49,7 @@ backend, blockchain, checker, coder, frontend, planner, researcher, shadcn
 
 - **/prd** — Scans your codebase (tech stack, quality gates, architecture), then generates a structured PRD with real file paths and auto-detected quality criteria
 - **/ralph** — Converts a PRD into `prd.json` format for autonomous execution, with exact quality check commands and file hints per story
-- **/codex-review** — Gets a second-opinion architectural review of a plan from OpenAI's Codex CLI, with up to 3 iterative feedback rounds
+- **/codex-review** — Reviews plans, validates implementations against plans, or reviews code changes via Codex CLI. Auto-detects mode from context, up to 3 iterative rounds
 
 ## Key Options
 
@@ -106,43 +106,45 @@ export CCSETUP_WORKFLOW=1
 
 When active, the hook suggests workflows like "Feature Development: Researcher → Planner → Coder → Checker" and asks if you'd like to follow it. When the env var is unset, the hook exits silently and Claude uses its default behavior.
 
-## Codex Review — Second-Opinion Plan Review
+## Codex Review — Plan, Implementation, and Code Review
 
-Get an architectural review of your plans from OpenAI's Codex CLI. Useful for catching blind spots before implementation.
+Get a second opinion from OpenAI's Codex CLI. The script auto-detects what to review:
+
+| Context | Review Mode |
+|---------|-------------|
+| Plan file, no code changes | **Plan review** — architectural soundness |
+| Plan file + git changes | **Implementation review** — validates code against the plan |
+| No plan file, git changes | **Code review** — bugs, security, quality |
 
 ### Usage
 
-In Claude Code, after creating a plan:
-
 ```
-/codex-review
-```
-
-Or review a specific file:
-
-```
-/codex-review plans/my-feature-plan.md
+/codex-review                              # Auto-detect from context
+/codex-review plans/my-feature-plan.md     # Review a specific plan
 ```
 
 ### What happens
 
-1. Finds your most recently modified plan file (or uses the one you specify)
-2. Sends it to Codex CLI for architectural review
-3. Presents structured feedback (architecture, risks, suggestions)
-4. Asks if you want to update the plan and re-review
-5. Repeats for up to 3 iterations, then stops for human input
+1. Detects available context (plan file and/or git changes)
+2. Sends to Codex CLI with a mode-appropriate review prompt
+3. Presents structured feedback (architecture, compliance, risks, suggestions)
+4. Asks if you want to apply fixes and re-review
+5. Repeats for up to 3 iterations
 
 ### Direct script usage
 
 ```bash
-# Review a plan file
+# Plan review (no git changes)
 ./scripts/codex-review/codex-review.sh plans/my-plan.md
+
+# Implementation review (plan + git changes auto-detected)
+./scripts/codex-review/codex-review.sh plans/my-plan.md
+
+# Code review (no plan, just git changes)
+./scripts/codex-review/codex-review.sh
 
 # Override the model
 ./scripts/codex-review/codex-review.sh plans/my-plan.md --model o3-mini
-
-# Via environment variable
-CODEX_REVIEW_MODEL=gpt-4o ./scripts/codex-review/codex-review.sh plans/my-plan.md
 
 # From stdin
 cat plans/my-plan.md | ./scripts/codex-review/codex-review.sh -
@@ -151,11 +153,11 @@ cat plans/my-plan.md | ./scripts/codex-review/codex-review.sh -
 ### Prerequisites
 
 1. **Codex CLI installed:** `npm install -g @openai/codex`
-2. **OpenAI API key configured:** `codex login` or set `CODEX_API_KEY`
+2. **Authenticated:** `codex login` or set `OPENAI_API_KEY`
 
 ### Codex Review Hook (Optional)
 
-An optional hook that suggests running `/codex-review` when a plan file is modified. Triggers on the `Stop` event.
+An optional hook that suggests running `/codex-review` when plan files are modified or code changes are detected. Triggers on the `Stop` event.
 
 **To activate:**
 
