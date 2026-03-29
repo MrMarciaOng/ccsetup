@@ -1,4 +1,10 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(osv-scanner scan:*)",
+      "Bash(osv-scanner:*)"
+    ]
+  },
   "hooks": {
     "UserPromptSubmit": [
       {
