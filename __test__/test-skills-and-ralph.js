@@ -7,6 +7,7 @@ const TEMPLATE_DIR = path.join(ROOT, 'template');
 const SKILLS_DIR = path.join(TEMPLATE_DIR, '.claude', 'skills');
 const RALPH_SCRIPTS_DIR = path.join(TEMPLATE_DIR, 'scripts', 'ralph');
 const HOOKS_DIR = path.join(TEMPLATE_DIR, 'hooks', 'workflow-selector');
+const ROOT_RALPH_SCRIPTS_DIR = path.join(ROOT, 'scripts', 'ralph');
 
 describe('Skills — Template File Structure', () => {
   test('skills directory exists with prd and ralph', () => {
@@ -213,6 +214,26 @@ describe('Ralph — Agent Instructions (CLAUDE.md)', () => {
   });
 });
 
+describe('Ralph — Codex Instructions (CODEX.md)', () => {
+  let content;
+
+  beforeAll(() => {
+    content = fs.readFileSync(path.join(RALPH_SCRIPTS_DIR, 'CODEX.md'), 'utf8');
+  });
+
+  test('exists in both template and repo scripts', () => {
+    expect(fs.existsSync(path.join(RALPH_SCRIPTS_DIR, 'CODEX.md'))).toBe(true);
+    expect(fs.existsSync(path.join(ROOT_RALPH_SCRIPTS_DIR, 'CODEX.md'))).toBe(true);
+  });
+
+  test('documents codex loop contract and completion signal', () => {
+    expect(content).toContain('Codex CLI');
+    expect(content).toContain('qualityChecks');
+    expect(content).toContain('progress.txt');
+    expect(content).toContain('<promise>COMPLETE</promise>');
+  });
+});
+
 describe('Ralph — Shell Script (ralph.sh)', () => {
   let content;
 
@@ -226,11 +247,11 @@ describe('Ralph — Shell Script (ralph.sh)', () => {
     expect(isExecutable).toBe(true);
   });
 
-  test('supports --tool flag with amp and claude options', () => {
+  test('supports --tool flag with claude and codex options', () => {
     expect(content).toContain('--tool)');
-    expect(content).toContain('TOOL="amp"');
-    expect(content).toContain('"amp"');
+    expect(content).toContain('TOOL="claude"');
     expect(content).toContain('"claude"');
+    expect(content).toContain('"codex"');
   });
 
   test('supports --model flag', () => {
@@ -260,6 +281,16 @@ describe('Ralph — Shell Script (ralph.sh)', () => {
 
   test('uses claude --dangerously-skip-permissions for autonomous mode', () => {
     expect(content).toContain('--dangerously-skip-permissions');
+  });
+
+  test('uses codex exec for codex mode', () => {
+    expect(content).toContain('codex exec');
+    expect(content).toContain('CODEX_PROMPT_FILE');
+  });
+
+  test('requires jq and no longer depends on prompt.md', () => {
+    expect(content).toContain('command -v jq');
+    expect(content).not.toContain('prompt.md');
   });
 });
 
@@ -358,12 +389,13 @@ describe('README.md — Documentation', () => {
 
   test('documents skills in project structure', () => {
     expect(content).toContain('skills/');
-    expect(content).toContain('/prd and /ralph slash commands');
+    expect(content).toContain('/prd, /ralph, and /codex-review slash commands');
   });
 
   test('documents ralph section with usage examples', () => {
     expect(content).toContain('## Ralph');
     expect(content).toContain('--tool claude');
+    expect(content).toContain('--tool codex');
     expect(content).toContain('--model opus');
     expect(content).toContain('checker subagent');
   });

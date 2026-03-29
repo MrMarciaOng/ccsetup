@@ -21,7 +21,7 @@
 │   └── hooks/         # Workflow selector and codex-review hooks
 ├── agents/            # Documentation only — see .claude/agents/ for active agents
 ├── scripts/
-│   ├── ralph/         # Autonomous agent loop (ralph.sh + agent instructions)
+│   ├── ralph/         # Autonomous agent loop (ralph.sh + Claude/Codex instructions)
 │   └── codex-review/  # Codex CLI review script (plans, implementations, code changes)
 ├── docs/              # Project documentation
 ├── plans/             # Project plans and architectural documents
@@ -77,12 +77,15 @@
 Ralph implements user stories from a PRD one at a time in a loop, with subagent verification after each story.
 
 ```bash
-./scripts/ralph/ralph.sh                          # Default: 10 iterations with amp
-./scripts/ralph/ralph.sh --tool claude             # Use Claude Code
+./scripts/ralph/ralph.sh                          # Default: 10 iterations with Claude Code
+./scripts/ralph/ralph.sh --tool claude            # Use Claude Code explicitly
+./scripts/ralph/ralph.sh --tool codex             # Use Codex CLI
 ./scripts/ralph/ralph.sh --tool claude --model opus 20  # Specify model + iterations
 ```
 
 Typical workflow: `/prd` → `/ralph` → `./scripts/ralph/ralph.sh`
+
+Prerequisites: `jq` plus the CLI for whichever runner you use (`claude` by default, or `codex` for `--tool codex`).
 
 ## Agent Orchestration
 

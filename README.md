@@ -32,7 +32,7 @@ my-project/
 ├── agents/
 │   └── README.md          # Agent documentation
 ├── scripts/
-│   ├── ralph/             # Autonomous agent loop
+│   ├── ralph/             # Autonomous agent loop for Claude Code or Codex
 │   └── codex-review/      # Codex CLI review script
 ├── docs/
 │   ├── ROADMAP.md         # Development roadmap
@@ -164,17 +164,20 @@ Ralph is an autonomous coding agent that implements user stories from a PRD one 
 3. **Run Ralph** — Launch the autonomous loop:
 
 ```bash
-# Default: 10 iterations using amp
+# Default: 10 iterations using Claude Code
 ./scripts/ralph/ralph.sh
 
-# Use Claude Code instead of amp
+# Use Claude Code explicitly
 ./scripts/ralph/ralph.sh --tool claude
+
+# Use Codex CLI instead of Claude Code
+./scripts/ralph/ralph.sh --tool codex
 
 # Specify model and max iterations
 ./scripts/ralph/ralph.sh --tool claude --model opus 20
 
-# Quick run with sonnet
-./scripts/ralph/ralph.sh --tool claude --model sonnet 5
+# Quick Codex run
+./scripts/ralph/ralph.sh --tool codex --model gpt-5 5
 ```
 
 ### What happens each iteration
@@ -192,13 +195,19 @@ Ralph is an autonomous coding agent that implements user stories from a PRD one 
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--tool amp\|claude` | `amp` | Which AI tool to use |
-| `--model opus\|sonnet\|haiku` | (default) | Model selection (Claude only) |
+| `--tool claude\|codex` | `claude` | Which AI tool to use |
+| `--model <model>` | (default) | Model selection for the chosen tool |
 | `[number]` | `10` | Max iterations |
 
 ### Archiving
 
 Ralph auto-archives previous runs when the branch changes. Archives are saved to `scripts/ralph/archive/YYYY-MM-DD-feature-name/`.
+
+### Prerequisites
+
+1. **`jq` installed** for PRD parsing and branch tracking
+2. **Claude Code CLI** for the default runner
+3. **Codex CLI** if you want `--tool codex`: `npm install -g @openai/codex`
 
 ## Documentation
 
