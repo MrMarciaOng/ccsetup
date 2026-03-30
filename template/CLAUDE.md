@@ -70,6 +70,7 @@
 - **/prd** — Scans the codebase, then generates a structured PRD with real file paths and auto-detected quality criteria. Saves to `tasks/prd-[feature-name].md`.
 - **/ralph** — Converts a PRD into `scripts/ralph/prd.json` for autonomous execution with quality checks and file hints per story.
 - **/codex-review** — Reviews plans, validates implementations against plans, or reviews code changes. Auto-detects what to review based on context. Iterates up to 3 times.
+- **/secops** — **NEVER install packages without running this first.** Scans dependencies for vulnerabilities using OSV Scanner. Use before any `pip`, `npm`, `cargo`, `gem`, or other package manager install.
 
 ## Ralph — Autonomous Agent Loop
 
@@ -132,3 +133,87 @@ See @plans/README.md for planning documents and architectural decisions
 ## Additional Notes
 
 [Any other important information for Claude to know about this project]
+
+---
+
+# 🔒 CRITICAL SECURITY - OSV-Scanner Requirement
+
+> **MANDATORY SECOPS POLICY**: All dependency installations MUST be scanned with `osv-scanner` BEFORE installation. **NEVER install packages without scanning first. No exceptions.**
+
+### Security Workflow - ALWAYS Follow This Order
+
+**BEFORE installing ANY dependencies:**
+
+1. **Query the OSV API to check the package before installing:**
+
+   ```bash
+   curl -s -X POST "https://api.osv.dev/v1/query" \
+     -H "Content-Type: application/json" \
+     -d '{"package": {"name": "PACKAGE_NAME", "ecosystem": "ECOSYSTEM"}, "version": "VERSION"}'
+   ```
+
+   | Package Manager | Ecosystem |
+   |---|---|
+   | pip | `PyPI` |
+   | npm/yarn/pnpm | `npm` |
+   | cargo | `crates.io` |
+   | go get | `Go` |
+   | gem | `RubyGems` |
+   | composer | `Packagist` |
+   | nuget | `NuGet` |
+   | maven | `Maven` |
+
+   - Empty `{}` = no known vulnerabilities → proceed
+   - Response contains `vulns` = **STOP**. Report to user, suggest safe version.
+
+2. **Prepare the lockfile for scanning:**
+
+   ```bash
+   osv-scanner scan -r .
+
+   # Or specific lockfile:
+   osv-scanner scan -L requirements.txt
+   osv-scanner scan -L package-lock.json
+   osv-scanner scan -L Cargo.lock
+   osv-scanner scan -L go.sum
+   ```
+
+3. **Review the scan results:**
+
+   - ❌ **If vulnerabilities are found:** STOP - Do NOT install. Report findings to the user and discuss mitigation options.
+   - ✅ **If scan is clean:** Proceed with installation.
+
+4. **Only after clean scan, install dependencies.**
+
+5. **After installation, rescan the entire project:**
+
+   ```bash
+   osv-scanner scan -r .
+   ```
+
+### Critical Rules
+
+1. **NEVER bypass osv-scanner** - This is a security requirement, not a suggestion
+2. **NEVER install packages without scanning first** - No exceptions
+3. **NEVER ignore osv-scanner warnings** - Always report vulnerabilities to the user
+4. **ALWAYS rescan after installation** - Verify the installed state is secure
+
+### Reporting Format
+
+When vulnerabilities are found, present them clearly and block installation:
+
+```
+⚠️ Found 2 vulnerabilities — installation blocked pending review:
+
+CRITICAL: lodash@4.17.20
+  - GHSA-35jh-r3h4-6jhm: Prototype Pollution
+  - Fix: upgrade to 4.17.21
+
+HIGH: axios@0.21.1
+  - CVE-2021-3749: SSRF
+  - Fix: upgrade to 0.21.2
+
+Upgrade affected packages?
+```
+
+Use `/secops` for the full workflow including lockfile generation and vulnerability ignoring.
