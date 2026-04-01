@@ -80,7 +80,7 @@ Pre-configured multi-agent workflows:
 - **API Development**: Planner → Backend → Frontend → Checker
 - **UI Components**: Frontend → Shadcn → Checker
 
-See [docs/agent-orchestration.md](docs/agent-orchestration.md) for details.
+See [docs/agent-orchestration.md](https://github.com/MrMarciaOng/ccsetup/blob/main/docs/agent-orchestration.md) for details.
 
 ### Workflow Selector Hook (Optional)
 
@@ -219,10 +219,10 @@ Ralph auto-archives previous runs when the branch changes. Archives are saved to
 
 ## Documentation
 
-- [Agent Orchestration](docs/agent-orchestration.md)
+- [Agent Orchestration](https://github.com/MrMarciaOng/ccsetup/blob/main/docs/agent-orchestration.md)
 - [Available Agents](template/agents/README.md)
-- [Codex Setup](docs/codex-setup.md)
-- [Ticket System](docs/ticket-system.md)
+- [Codex Setup](https://github.com/MrMarciaOng/ccsetup/blob/main/docs/codex-setup.md)
+- [Ticket System](https://github.com/MrMarciaOng/ccsetup/blob/main/docs/ticket-system.md)
 
 ## Credits
 
