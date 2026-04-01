@@ -28,8 +28,8 @@ my-project/
 ├── GEMINI.md              # Gemini setup (optional)
 ├── .claude/
 │   ├── agents/            # 8 core agents
-│   ├── skills/            # /prd, /ralph, and /codex-review skills
-│   └── settings.json
+│   ├── skills/            # /prd, /ralph, /codex-review, and /secops skills
+│   └── settings.json      # Claude permissions and optional hook wiring
 ├── .codex/
 │   └── skills/            # Project-local Codex skills: prd, ralph, codex-review
 ├── agents/
@@ -53,6 +53,9 @@ backend, blockchain, checker, coder, frontend, planner, researcher, shadcn
 - **/prd** — Scans your codebase (tech stack, quality gates, architecture), then generates a structured PRD with real file paths and auto-detected quality criteria
 - **/ralph** — Converts a PRD into `prd.json` format for autonomous execution, with exact quality check commands and file hints per story
 - **/codex-review** — Reviews plans, validates implementations against plans, or reviews code changes via Codex CLI. Auto-detects mode from context, up to 3 iterative rounds
+- **/secops** — Claude-only security skill that blocks dependency installs until `osv-scanner` checks the package or lockfile for known vulnerabilities
+
+Claude projects also ship with `osv-scanner` Bash permissions preconfigured in `.claude/settings.json` so the `/secops` workflow can run without extra permission prompts.
 
 ## Key Options
 
@@ -226,6 +229,8 @@ Ralph auto-archives previous runs when the branch changes. Archives are saved to
 Born from discussions in TechOverflow with [vichannnnn](https://github.com/vichannnnn), [MrMarciaOng](https://github.com/MrMarciaOng), and [nasdin](https://github.com/nasdin).
 
 Agent collection from [wshobson/agents](https://github.com/wshobson/agents).
+
+Security workflow and `/secops` skill contribution by [Ciaran Hughes](https://github.com/Ciaran-Hughes).
 
 ## License
 
