@@ -129,6 +129,7 @@ if (projectName !== '.') {
 
 const targetDir = path.resolve(process.cwd(), projectName);
 const templateDir = path.join(__dirname, '..', 'template');
+const VALID_AI_PROVIDERS = new Set(['claude', 'codex', 'both']);
 
 // Create readline interface only if needed
 let rl = null;
@@ -177,6 +178,72 @@ function validateAgentFile(file) {
     return false;
   }
   return true;
+}
+
+function includesClaude(provider) {
+  return provider === 'claude' || provider === 'both';
+}
+
+function includesCodex(provider) {
+  return provider === 'codex' || provider === 'both';
+}
+
+function getEnvBoolean(name) {
+  const value = process.env[name];
+  if (value == null || value === '') return null;
+
+  const normalized = value.toLowerCase().trim();
+  if (['1', 'true', 'yes', 'y'].includes(normalized)) return true;
+  if (['0', 'false', 'no', 'n'].includes(normalized)) return false;
+  return null;
+}
+
+function getConfiguredAiProvider() {
+  const envValue = process.env.CCSETUP_AI_PROVIDER;
+  if (!envValue) return null;
+
+  const normalized = envValue.toLowerCase().trim();
+  if (!VALID_AI_PROVIDERS.has(normalized)) {
+    throw new Error(`Invalid CCSETUP_AI_PROVIDER value: ${envValue}`);
+  }
+
+  return normalized;
+}
+
+async function selectAiProvider() {
+  const envProvider = getConfiguredAiProvider();
+  if (envProvider) {
+    return envProvider;
+  }
+
+  if (flags.force || flags.dryRun) {
+    return 'claude';
+  }
+
+  const selectModule = await import('@inquirer/select');
+  const select = selectModule.default;
+
+  return select({
+    message: 'Which AI setup would you like to generate for this project?',
+    choices: [
+      {
+        name: 'Claude Code',
+        value: 'claude',
+        description: 'Copy CLAUDE.md and the .claude project setup'
+      },
+      {
+        name: 'Codex CLI',
+        value: 'codex',
+        description: 'Copy AGENTS.md plus project-local Codex skills'
+      },
+      {
+        name: 'Both',
+        value: 'both',
+        description: 'Copy both Claude Code and Codex project assets'
+      }
+    ],
+    default: 'claude'
+  });
 }
 
 // Function to check if Claude Code is installed
@@ -489,6 +556,126 @@ async function initializeClaudeDirectory(selectedAgentFiles, conflictStrategy, d
     
   } catch (error) {
     throw new Error(`Failed to initialize .claude directory: ${error.message}`);
+  }
+}
+
+async function initializeCodexDirectory(conflictStrategy, dryRun) {
+  const codexDir = path.join(targetDir, '.codex');
+  const skillsDir = path.join(codexDir, 'skills');
+  const templateCodexDir = path.join(templateDir, '.codex');
+  const createdItems = [];
+  const skippedItems = [];
+
+  function copyCodexFile(src, dest, relativePath) {
+    if (!fs.existsSync(src)) {
+      return;
+    }
+
+    if (!fs.existsSync(dest)) {
+      if (!dryRun) {
+        fs.mkdirSync(path.dirname(dest), { recursive: true });
+        fs.copyFileSync(src, dest);
+      }
+      createdItems.push(relativePath);
+      if (dryRun) {
+        console.log(`  ✨ Would copy: ${relativePath}`);
+      }
+      return;
+    }
+
+    if (conflictStrategy === 'overwrite') {
+      if (!dryRun) {
+        fs.copyFileSync(src, dest);
+      }
+      if (dryRun) {
+        console.log(`  ♻️  Would replace: ${relativePath}`);
+      }
+      createdItems.push(relativePath);
+      return;
+    }
+
+    if (conflictStrategy === 'rename') {
+      const ext = path.extname(dest);
+      const baseName = path.basename(dest, ext);
+      const dirName = path.dirname(dest);
+      let newDest = path.join(dirName, `${baseName}-ccsetup${ext}`);
+      let counter = 1;
+      while (fs.existsSync(newDest)) {
+        newDest = path.join(dirName, `${baseName}-ccsetup-${counter}${ext}`);
+        counter++;
+      }
+      if (!dryRun) {
+        fs.copyFileSync(src, newDest);
+      }
+      createdItems.push(path.relative(targetDir, newDest));
+      if (dryRun) {
+        console.log(`  📄 Would create: ${path.relative(targetDir, newDest)}`);
+      }
+      return;
+    }
+
+    skippedItems.push(relativePath);
+    if (dryRun) {
+      console.log(`  ⏭️  Would skip: ${relativePath}`);
+    }
+  }
+
+  try {
+    if (!fs.existsSync(codexDir)) {
+      if (!dryRun) {
+        fs.mkdirSync(codexDir, { recursive: true });
+      }
+      createdItems.push('.codex/');
+      if (dryRun) {
+        console.log('  📁 Would create directory: .codex/');
+      }
+    } else {
+      skippedItems.push('.codex/');
+    }
+
+    if (!fs.existsSync(skillsDir)) {
+      if (!dryRun) {
+        fs.mkdirSync(skillsDir, { recursive: true });
+      }
+      createdItems.push('.codex/skills/');
+      if (dryRun) {
+        console.log('  📁 Would create directory: .codex/skills/');
+      }
+    } else {
+      skippedItems.push('.codex/skills/');
+    }
+
+    const templateSkillsDir = path.join(templateCodexDir, 'skills');
+    if (fs.existsSync(templateSkillsDir)) {
+      const skillDirs = fs.readdirSync(templateSkillsDir, { withFileTypes: true }).filter(entry => entry.isDirectory());
+      for (const entry of skillDirs) {
+        const srcDir = path.join(templateSkillsDir, entry.name);
+        const skillFileSrc = path.join(srcDir, 'SKILL.md');
+
+        if (!fs.existsSync(skillFileSrc)) {
+          continue;
+        }
+
+        const destDir = path.join(skillsDir, entry.name);
+        const skillFileDest = path.join(destDir, 'SKILL.md');
+
+        if (!fs.existsSync(destDir)) {
+          if (!dryRun) {
+            fs.mkdirSync(destDir, { recursive: true });
+          }
+          createdItems.push(`.codex/skills/${entry.name}/`);
+          if (dryRun) {
+            console.log(`  📁 Would create directory: .codex/skills/${entry.name}/`);
+          }
+        }
+
+        copyCodexFile(skillFileSrc, skillFileDest, `.codex/skills/${entry.name}/SKILL.md`);
+      }
+    }
+
+    return { createdItems, skippedItems };
+  } catch (error) {
+    throw new Error(`Failed to initialize .codex directory: ${error.message}`);
   }
 }
 
@@ -1232,10 +1419,27 @@ async function main() {
       await installClaudeHooks();
       return;
     }
+
+    if (!flags.force && !flags.dryRun && rl) {
+      rl.close();
+      rl = null;
+    }
+
+    const aiProvider = await selectAiProvider();
     
     // Handle --agents and --browse flags for agent selection only
     if (flags.agents || flags.browse) {
+      if (!includesClaude(aiProvider)) {
+        console.log('Claude agent selection is only available for Claude Code setup.');
+        console.log('Re-run full setup to generate Codex assets.\n');
+        process.exit(0);
+      }
+
       console.log('🤖 Interactive Agent Selection\n');
+
+      if (aiProvider === 'both') {
+        console.log('This step configures Claude Code agents only. Codex assets are created during full setup.\n');
+      }
       
       let selectedAgentFiles = [];
       
@@ -1294,6 +1498,13 @@ async function main() {
       process.exit(0);
     }
 
+    if (!flags.force && !flags.dryRun && !rl) {
+      rl = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout
+      });
+    }
+
     // Additional path validation
     const normalizedTarget = path.normalize(targetDir);
     const normalizedCwd = path.normalize(process.cwd());
@@ -1308,8 +1519,12 @@ async function main() {
     }
 
     // Check for Claude Code installation
-    const claudeStatus = checkClaudeCode();
-    if (projectName === '.') {
+    const claudeStatus = includesClaude(aiProvider) ? checkClaudeCode() : {
+      isInstalled: false,
+      hasClaudeDir: false,
+      hasClaudeCodeFile: false
+    };
+    if (includesClaude(aiProvider) && projectName === '.') {
       if (flags.dryRun) {
         console.log('⚠️  Note: Claude Code detection skipped in dry-run mode for current directory\n');
       } else if (!claudeStatus.isInstalled && !claudeStatus.hasClaudeDir) {
@@ -1343,7 +1558,12 @@ async function main() {
 
     // Escape targetDir for safe display
     const safeTargetDir = targetDir.replace(/[^\w\s\-./\\:]/g, '');
-    console.log(`${flags.dryRun ? 'Would create' : 'Creating'} Claude Code project in ${safeTargetDir}...`);
+    const projectLabel = aiProvider === 'both'
+      ? 'Claude Code + Codex'
+      : aiProvider === 'codex'
+        ? 'Codex'
+        : 'Claude Code';
+    console.log(`${flags.dryRun ? 'Would create' : 'Creating'} ${projectLabel} project in ${safeTargetDir}...`);
 
     if (projectName !== '.') {
       if (!fs.existsSync(targetDir)) {
@@ -1364,8 +1584,8 @@ async function main() {
       }
 
       // Check Claude Code in new directory after creation
-      const newDirClaudeStatus = checkClaudeCode();
-      if (!flags.dryRun && !newDirClaudeStatus.isInstalled) {
+      const newDirClaudeStatus = includesClaude(aiProvider) ? checkClaudeCode() : { isInstalled: true };
+      if (includesClaude(aiProvider) && !flags.dryRun && !newDirClaudeStatus.isInstalled) {
         console.log('\n⚠️  Note: Claude Code is not initialized in the new project directory.');
         console.log('After setup, remember to:');
         console.log(`1. cd ${JSON.stringify(projectName)}`);
@@ -1380,7 +1600,9 @@ async function main() {
   // Group conflicts by category
   const conflictsByCategory = {
     'CLAUDE.md': [],
+    'AGENTS.md': [],
     'agents': [],
+    'codex': [],
     'docs': [],
     'plans': [],
     'tickets': []
@@ -1389,7 +1611,9 @@ async function main() {
   // Store conflict strategies per category
   const conflictStrategies = {
     'CLAUDE.md': 'skip',
+    'AGENTS.md': 'skip',
     'agents': 'skip',
+    'codex': 'skip',
     'docs': 'skip',
     'plans': 'skip',
     'tickets': 'skip'
@@ -1401,7 +1625,10 @@ async function main() {
   
 
   // Determine which agents to include
-  if (flags.noAgents) {
+  if (!includesClaude(aiProvider)) {
+    selectedAgentFiles = [];
+    console.log('\n⏭️  Skipping Claude agents for Codex-only setup');
+  } else if (flags.noAgents) {
     selectedAgentFiles = [];
     console.log('\n⏭️  Skipping agent selection (--no-agents flag)');
   } else if (flags.browseAgents) {
@@ -1507,6 +1734,10 @@ async function main() {
         // Skip .claude directory as it will be handled separately
         if (path.basename(src) === '.claude') {
           return; // Don't process .claude directory in regular template scan
+        }
+
+        if (path.basename(src) === '.codex') {
+          return; // Don't process .codex directory in regular template scan
         }
         
         // Skip hooks directory - hooks should only be installed to .claude/hooks via --install-hooks
@@ -1615,6 +1846,14 @@ async function main() {
           );
         });
       } else {
+        if (
+          (!includesClaude(aiProvider) && relativePath === 'CLAUDE.md') ||
+          (!includesCodex(aiProvider) && relativePath === 'AGENTS.md') ||
+          (!includesCodex(aiProvider) && relativePath === path.join('docs', 'codex-setup.md'))
+        ) {
+          return;
+        }
+
         allItems.push({ 
           src, 
           dest, 
@@ -1629,8 +1868,12 @@ async function main() {
           // Categorize the conflict
           if (relativePath === 'CLAUDE.md') {
             conflictsByCategory['CLAUDE.md'].push(relativePath);
+          } else if (relativePath === 'AGENTS.md') {
+            conflictsByCategory['AGENTS.md'].push(relativePath);
           } else if (relativePath.startsWith('agents/')) {
             conflictsByCategory['agents'].push(relativePath);
+          } else if (relativePath.startsWith('.codex/')) {
+            conflictsByCategory['codex'].push(relativePath);
           } else if (relativePath.startsWith('docs/')) {
             conflictsByCategory['docs'].push(relativePath);
           } else if (relativePath.startsWith('plans/')) {
@@ -1646,6 +1889,40 @@ async function main() {
   }
 
   scanTemplate(templateDir, targetDir, '', true);
+
+  function scanCodexConflicts() {
+    if (!includesCodex(aiProvider)) {
+      return;
+    }
+
+    const templateCodexDir = path.join(templateDir, '.codex');
+    if (!fs.existsSync(templateCodexDir)) {
+      return;
+    }
+
+    function walk(srcDir, relBase = '.codex') {
+      const entries = fs.readdirSync(srcDir, { withFileTypes: true });
+      for (const entry of entries) {
+        const src = path.join(srcDir, entry.name);
+        const relativePath = path.join(relBase, entry.name);
+        const dest = path.join(targetDir, relativePath);
+
+        if (entry.isDirectory()) {
+          walk(src, relativePath);
+          continue;
+        }
+
+        if (fs.existsSync(dest)) {
+          fileConflicts.push(relativePath);
+          conflictsByCategory['codex'].push(relativePath);
+        }
+      }
+    }
+
+    walk(templateCodexDir);
+  }
+
+  scanCodexConflicts();
 
   // Handle force flag
   if (flags.force) {
@@ -1670,7 +1947,9 @@ async function main() {
         // Ask for resolution strategy for each category with conflicts
         const categories = [
           { key: 'CLAUDE.md', name: 'CLAUDE.md', emoji: '📄' },
+          { key: 'AGENTS.md', name: 'AGENTS.md', emoji: '🧭' },
           { key: 'agents', name: 'Agents', emoji: '🤖' },
+          { key: 'codex', name: 'Codex', emoji: '🧠' },
           { key: 'docs', name: 'Documentation', emoji: '📚' },
           { key: 'plans', name: 'Plans', emoji: '📋' },
           { key: 'tickets', name: 'Tickets', emoji: '🎫' }
@@ -1701,17 +1980,17 @@ async function main() {
             
             // Strategy will always be valid when using select, no need for validation
             
-            if (strategy === 'overwrite' && category.key === 'CLAUDE.md') {
+            if (strategy === 'overwrite' && (category.key === 'CLAUDE.md' || category.key === 'AGENTS.md')) {
               // Use inquirer instead of readline prompt
               const confirmModule = await import('@inquirer/confirm');
               const confirm = confirmModule.default;
               const shouldOverwrite = await confirm({
-                message: '⚠️  Are you sure you want to overwrite CLAUDE.md? This will lose your project instructions!',
+                message: `⚠️  Are you sure you want to overwrite ${category.key}? This will lose your project instructions!`,
                 default: false
               });
               if (!shouldOverwrite) {
                 conflictStrategies[category.key] = 'skip';
-                console.log('Keeping existing CLAUDE.md');
+                console.log(`Keeping existing ${category.key}`);
                 continue;
               }
             }
@@ -1746,8 +2025,12 @@ async function main() {
           let strategy = 'skip'; // default
           if (item.relativePath === 'CLAUDE.md') {
             strategy = conflictStrategies['CLAUDE.md'];
+          } else if (item.relativePath === 'AGENTS.md') {
+            strategy = conflictStrategies['AGENTS.md'];
           } else if (item.relativePath.startsWith('agents/')) {
             strategy = conflictStrategies['agents'];
+          } else if (item.relativePath.startsWith('.codex/')) {
+            strategy = conflictStrategies['codex'];
           } else if (item.relativePath.startsWith('docs/')) {
             strategy = conflictStrategies['docs'];
           } else if (item.relativePath.startsWith('plans/')) {
@@ -1813,32 +2096,42 @@ async function main() {
     }
   }
 
-  // Initialize .claude directory and copy agents
+  // Initialize provider-specific directories
   let claudeInitResult = null;
-  // Always initialize .claude directory structure (it will handle existing directories)
-  console.log(`\n🔧 ${claudeStatus.hasClaudeDir ? 'Updating' : 'Initializing'} .claude directory structure...`);
-  claudeInitResult = await initializeClaudeDirectory(selectedAgentFiles, conflictStrategies['agents'], flags.dryRun);
-  
-  if (claudeInitResult.createdItems.length > 0) {
-    console.log(`  ✅ Created ${claudeInitResult.createdItems.length} items in .claude directory`);
-  }
-  if (claudeInitResult.copiedAgents > 0) {
-    console.log(`  🤖 Copied ${claudeInitResult.copiedAgents} agents to .claude/agents`);
-  }
-  if (claudeInitResult.skippedAgents > 0) {
-    console.log(`  ⏭️  Skipped ${claudeInitResult.skippedAgents} existing agents in .claude/agents`);
+  let codexInitResult = null;
+  if (includesClaude(aiProvider)) {
+    console.log(`\n🔧 ${claudeStatus.hasClaudeDir ? 'Updating' : 'Initializing'} .claude directory structure...`);
+    claudeInitResult = await initializeClaudeDirectory(selectedAgentFiles, conflictStrategies['agents'], flags.dryRun);
+    
+    if (claudeInitResult.createdItems.length > 0) {
+      console.log(`  ✅ Created ${claudeInitResult.createdItems.length} items in .claude directory`);
+    }
+    if (claudeInitResult.copiedAgents > 0) {
+      console.log(`  🤖 Copied ${claudeInitResult.copiedAgents} agents to .claude/agents`);
+    }
+    if (claudeInitResult.skippedAgents > 0) {
+      console.log(`  ⏭️  Skipped ${claudeInitResult.skippedAgents} existing agents in .claude/agents`);
+    }
   }
 
-  console.log(`\n✅ Claude Code project ${flags.dryRun ? 'would be' : ''} created successfully!`);
+  if (includesCodex(aiProvider)) {
+    console.log(`\n🔧 ${fs.existsSync(path.join(targetDir, '.codex')) ? 'Updating' : 'Initializing'} .codex directory structure...`);
+    codexInitResult = await initializeCodexDirectory(conflictStrategies['codex'], flags.dryRun);
+    if (codexInitResult.createdItems.length > 0) {
+      console.log(`  ✅ Created ${codexInitResult.createdItems.length} items in .codex directory`);
+    }
+  }
+
+  console.log(`\n✅ ${projectLabel} project ${flags.dryRun ? 'would be ' : ''}created successfully!`);
   
   // Show summary of what happened
-  if (fileConflicts.length > 0 || copiedCount > 0 || selectedAgentFiles.length > 0 || claudeInitResult) {
+  if (fileConflicts.length > 0 || copiedCount > 0 || selectedAgentFiles.length > 0 || claudeInitResult || codexInitResult) {
     console.log('\n📊 Summary:');
     if (copiedCount > 0) console.log(`  ✨ ${copiedCount} new files ${flags.dryRun ? 'would be' : ''} copied`);
     if (skippedCount > 0) console.log(`  ⏭️  ${skippedCount} existing files ${flags.dryRun ? 'would be' : ''} kept unchanged`);
     if (renamedCount > 0) console.log(`  📄 ${renamedCount} template files ${flags.dryRun ? 'would be' : ''} saved with -ccsetup suffix`);
     if (overwrittenCount > 0) console.log(`  ♻️  ${overwrittenCount} files ${flags.dryRun ? 'would be' : ''} replaced with template versions`);
-    if (!flags.noAgents && !flags.dryRun) {
+    if (includesClaude(aiProvider) && !flags.noAgents && !flags.dryRun) {
       if (flags.browseAgents) {
         const agentCount = availableAgents.length;
         console.log(`  📚 ${agentCount} agent${agentCount === 1 ? '' : 's'} ${flags.dryRun ? 'would be' : ''} copied to /agents for browsing`);
@@ -1850,6 +2143,9 @@ async function main() {
     if (claudeInitResult && claudeInitResult.createdItems.length > 0) {
       console.log(`  📁 ${claudeInitResult.createdItems.length} items created in .claude directory`);
     }
+    if (codexInitResult && codexInitResult.createdItems.length > 0) {
+      console.log(`  🧠 ${codexInitResult.createdItems.length} items created in .codex directory`);
+    }
   }
   
   if (!flags.dryRun) {
@@ -1858,15 +2154,21 @@ async function main() {
       // Escape project name to prevent command injection
       const escapedProjectName = JSON.stringify(projectName);
       console.log(`  cd ${escapedProjectName}`);
-      const finalClaudeStatus = checkClaudeCode();
-      if (!finalClaudeStatus.isInstalled) {
+      const finalClaudeStatus = includesClaude(aiProvider) ? checkClaudeCode() : { isInstalled: true };
+      if (includesClaude(aiProvider) && !finalClaudeStatus.isInstalled) {
         console.log('  claude init    # Initialize Claude Code in the project');
       }
     }
-    console.log('  1. Edit CLAUDE.md to add your project-specific instructions');
-    console.log('  2. Update docs/ROADMAP.md with your project goals');
-    console.log('  3. Update docs/agent-orchestration.md to define agent workflows');
-    console.log('  4. Start creating tickets in the tickets/ directory');
+    if (includesClaude(aiProvider)) {
+      console.log('  1. Edit CLAUDE.md to add your project-specific instructions');
+    }
+    if (includesCodex(aiProvider)) {
+      console.log(`  ${includesClaude(aiProvider) ? '2' : '1'}. Edit AGENTS.md to add your Codex project instructions`);
+      console.log(`  ${includesClaude(aiProvider) ? '3' : '2'}. Review docs/codex-setup.md for Codex setup guidance`);
+    }
+    console.log(`  ${includesClaude(aiProvider) && includesCodex(aiProvider) ? '4' : includesCodex(aiProvider) ? '3' : '2'}. Update docs/ROADMAP.md with your project goals`);
+    console.log(`  ${includesClaude(aiProvider) && includesCodex(aiProvider) ? '5' : includesCodex(aiProvider) ? '4' : '3'}. Update docs/agent-orchestration.md to define agent workflows`);
+    console.log(`  ${includesClaude(aiProvider) && includesCodex(aiProvider) ? '6' : includesCodex(aiProvider) ? '5' : '4'}. Start creating tickets in the tickets/ directory`);
     
     if (flags.browseAgents) {
       console.log('\n📚 Agent Browse Mode:');
@@ -1882,8 +2184,13 @@ async function main() {
       console.log('   You can compare them with your existing files or copy sections you need');
     }
     
+    if (includesCodex(aiProvider)) {
+      console.log('\n🧠 Codex skills copied to .codex/skills/');
+      console.log('  Use them from this project alongside AGENTS.md and docs/codex-setup.md');
+    }
+
     // Ask user if they want the workflow selector hook
-    if (setupMode === 'full' && !flags.dryRun) {
+    if (includesClaude(aiProvider) && setupMode === 'full' && !flags.dryRun) {
       const claudeDir = path.join(targetDir, '.claude');
       if (fs.existsSync(claudeDir)) {
         try {

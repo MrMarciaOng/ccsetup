@@ -3,7 +3,7 @@
 [![npm version](https://img.shields.io/npm/v/ccsetup.svg)](https://www.npmjs.com/package/ccsetup)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-One-command setup for Claude Code projects. Creates a ready-to-use project structure with 8 core agents, orchestration workflows, ticket system, and planning tools.
+One-command setup for Claude Code and Codex projects. Creates a ready-to-use project structure with planning tools, review workflows, and optional AI-specific project setup.
 
 ## Quick Start
 
@@ -22,13 +22,16 @@ npx ccsetup .
 
 ```
 my-project/
-├── CLAUDE.md              # Project instructions for Claude
+├── CLAUDE.md              # Project instructions for Claude (Claude/Both)
+├── AGENTS.md              # Project instructions for Codex (Codex/Both)
 ├── CONTRIBUTING.md        # Contribution guidelines
 ├── GEMINI.md              # Gemini setup (optional)
 ├── .claude/
 │   ├── agents/            # 8 core agents
-│   ├── skills/            # /prd, /ralph, and /codex-review slash commands
+│   ├── skills/            # /prd, /ralph, and /codex-review skills
 │   └── settings.json
+├── .codex/
+│   └── skills/            # Project-local Codex skills: prd, ralph, codex-review
 ├── agents/
 │   └── README.md          # Agent documentation
 ├── scripts/
@@ -62,6 +65,8 @@ npx ccsetup my-project --force         # Skip prompts, overwrite existing
 npx ccsetup my-project --browse        # Enhanced template browsing UI
 npx ccsetup --install-hooks            # Install workflow selection hooks (advanced)
 ```
+
+During setup, `ccsetup` asks whether to generate a `Claude`, `Codex`, or `Both` project environment.
 
 ## Agent Workflows
 
@@ -213,6 +218,7 @@ Ralph auto-archives previous runs when the branch changes. Archives are saved to
 
 - [Agent Orchestration](docs/agent-orchestration.md)
 - [Available Agents](template/agents/README.md)
+- [Codex Setup](docs/codex-setup.md)
 - [Ticket System](docs/ticket-system.md)
 
 ## Credits

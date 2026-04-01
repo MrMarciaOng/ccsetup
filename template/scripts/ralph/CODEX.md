@@ -15,7 +15,7 @@ You are an autonomous coding agent working on a software project through the Cod
 9. If verification passes, commit all changes with `feat: [Story ID] - [Story Title]`.
 10. If verification fails, fix the issues, rerun quality checks, and verify again.
 11. Update `prd.json` to set `passes: true` and replace `notes` with what was actually done.
-12. Add reusable learnings to nearby `CLAUDE.md` files when they would help future work.
+12. Add reusable learnings to nearby `AGENTS.md` files when they would help future work.
 13. Append a progress entry to `progress.txt`.
 
 ## Quality Checks

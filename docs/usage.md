@@ -13,12 +13,16 @@ npx ccsetup .
 npx ccsetup
 ```
 
-Then initialize Claude Code:
+Then initialize your chosen AI environment:
 
 ```bash
 cd my-project
+# Claude Code
 claude init
 claude
+
+# Codex CLI
+codex
 ```
 
 ## CLI Options
@@ -41,6 +45,12 @@ ccsetup [project-name] [options]
 | `--help, -h` | Show help |
 
 ## Agent Selection
+
+Before agent selection, setup asks whether to generate:
+
+- **Claude** — copies `CLAUDE.md` and `.claude/`
+- **Codex** — copies `AGENTS.md` and `.codex/`
+- **Both** — copies both environments
 
 During setup you choose one of:
 
@@ -66,21 +76,24 @@ Files are grouped by category (CLAUDE.md, agents, docs, plans, tickets) so you c
 
 ```
 my-project/
-├── CLAUDE.md          # Project instructions for Claude
+├── CLAUDE.md          # Project instructions for Claude (Claude/Both)
+├── AGENTS.md          # Project instructions for Codex (Codex/Both)
+├── .codex/            # Project-local Codex skills
 ├── agents/            # Specialized AI agents
 ├── docs/
 │   ├── ROADMAP.md     # Project goals and progress
-│   └── agent-orchestration.md  # Workflow patterns
+│   ├── agent-orchestration.md  # Workflow patterns
+│   └── codex-setup.md          # Codex setup instructions
 ├── plans/             # Architecture and implementation plans
 └── tickets/           # Task tracking
 ```
 
 ## Post-Setup
 
-1. Customize `CLAUDE.md` with project-specific commands and standards
+1. Customize `CLAUDE.md` and/or `AGENTS.md` with project-specific instructions
 2. Define goals in `docs/ROADMAP.md`
 3. Create your first ticket in `tickets/`
-4. Start with: `"Read CLAUDE.md to understand this project"`
+4. If using Codex, keep `.codex/skills/` in the project alongside `AGENTS.md`
 
 ## Environment Variables
 

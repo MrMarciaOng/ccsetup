@@ -54,11 +54,23 @@ describe('Template Source Verification', () => {
 
   test('template has expected base files', () => {
     expect(fs.existsSync(path.join(TEMPLATE_DIR, 'CLAUDE.md'))).toBe(true);
+    expect(fs.existsSync(path.join(TEMPLATE_DIR, 'AGENTS.md'))).toBe(true);
     expect(fs.existsSync(path.join(TEMPLATE_DIR, '.claude', 'settings.json'))).toBe(true);
+    expect(fs.existsSync(path.join(TEMPLATE_DIR, '.codex', 'install-skills.sh'))).toBe(false);
+    expect(fs.existsSync(path.join(TEMPLATE_DIR, '.codex', 'skills', 'prd', 'SKILL.md'))).toBe(true);
+    expect(fs.existsSync(path.join(TEMPLATE_DIR, '.codex', 'skills', 'ralph', 'SKILL.md'))).toBe(true);
+    expect(fs.existsSync(path.join(TEMPLATE_DIR, '.codex', 'skills', 'codex-review', 'SKILL.md'))).toBe(true);
+    expect(fs.existsSync(path.join(TEMPLATE_DIR, '.codex', 'skills', 'project-workflow'))).toBe(false);
+    expect(fs.existsSync(path.join(TEMPLATE_DIR, '.codex', 'skills-src'))).toBe(false);
     expect(fs.existsSync(path.join(TEMPLATE_DIR, 'docs', 'ROADMAP.md'))).toBe(true);
     expect(fs.existsSync(path.join(TEMPLATE_DIR, 'docs', 'agent-orchestration.md'))).toBe(true);
+    expect(fs.existsSync(path.join(TEMPLATE_DIR, 'docs', 'codex-setup.md'))).toBe(true);
     expect(fs.existsSync(path.join(TEMPLATE_DIR, 'tickets', 'README.md'))).toBe(true);
     expect(fs.existsSync(path.join(TEMPLATE_DIR, 'plans', 'README.md'))).toBe(true);
+  });
+
+  test('repo docs include codex setup guide linked from README', () => {
+    expect(fs.existsSync(path.join(ROOT, 'docs', 'codex-setup.md'))).toBe(true);
   });
 });
 

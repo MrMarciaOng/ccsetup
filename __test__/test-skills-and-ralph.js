@@ -5,6 +5,7 @@ const { execSync } = require('child_process');
 const ROOT = path.join(__dirname, '..');
 const TEMPLATE_DIR = path.join(ROOT, 'template');
 const SKILLS_DIR = path.join(TEMPLATE_DIR, '.claude', 'skills');
+const CODEX_SKILLS_DIR = path.join(TEMPLATE_DIR, '.codex', 'skills');
 const RALPH_SCRIPTS_DIR = path.join(TEMPLATE_DIR, 'scripts', 'ralph');
 const HOOKS_DIR = path.join(TEMPLATE_DIR, 'hooks', 'workflow-selector');
 const ROOT_RALPH_SCRIPTS_DIR = path.join(ROOT, 'scripts', 'ralph');
@@ -20,6 +21,12 @@ describe('Skills — Template File Structure', () => {
   test('each skill has a SKILL.md file', () => {
     expect(fs.existsSync(path.join(SKILLS_DIR, 'prd', 'SKILL.md'))).toBe(true);
     expect(fs.existsSync(path.join(SKILLS_DIR, 'ralph', 'SKILL.md'))).toBe(true);
+  });
+
+  test('codex skills directory mirrors core Claude skills', () => {
+    expect(fs.existsSync(path.join(CODEX_SKILLS_DIR, 'prd', 'SKILL.md'))).toBe(true);
+    expect(fs.existsSync(path.join(CODEX_SKILLS_DIR, 'ralph', 'SKILL.md'))).toBe(true);
+    expect(fs.existsSync(path.join(CODEX_SKILLS_DIR, 'codex-review', 'SKILL.md'))).toBe(true);
   });
 });
 
@@ -232,6 +239,38 @@ describe('Ralph — Codex Instructions (CODEX.md)', () => {
     expect(content).toContain('progress.txt');
     expect(content).toContain('<promise>COMPLETE</promise>');
   });
+
+  test('writes reusable learnings to AGENTS.md rather than CLAUDE.md', () => {
+    expect(content).toContain('AGENTS.md');
+    expect(content).not.toContain('nearby `CLAUDE.md` files');
+  });
+});
+
+describe('Codex Skills — Mirrored Coverage', () => {
+  test('codex prd skill keeps the same planning depth with AGENTS.md context', () => {
+    const content = fs.readFileSync(path.join(CODEX_SKILLS_DIR, 'prd', 'SKILL.md'), 'utf8');
+    expect(content).toContain('## Step 1: Codebase Reconnaissance');
+    expect(content).toContain('Read `AGENTS.md` (root and any nested)');
+    expect(content).toContain('This section helps implementers (human or AI) understand the codebase without re-scanning.');
+    expect(content).toContain('This lets users respond with "1A, 2C, 3B" for quick iteration.');
+    expect(content).toContain('## Checklist');
+  });
+
+  test('codex ralph skill keeps qualityChecks, notes, and archive guidance', () => {
+    const content = fs.readFileSync(path.join(CODEX_SKILLS_DIR, 'ralph', 'SKILL.md'), 'utf8');
+    expect(content).toContain('The `qualityChecks` field');
+    expect(content).toContain('The `notes` field');
+    expect(content).toContain('## Archiving Previous Runs');
+    expect(content).toContain('Story `notes` pre-populated with relevant file paths');
+  });
+
+  test('codex review skill keeps full implementation-review guidance', () => {
+    const content = fs.readFileSync(path.join(CODEX_SKILLS_DIR, 'codex-review', 'SKILL.md'), 'utf8');
+    expect(content).toContain('Implementation review');
+    expect(content).toContain('you MUST pass the plan file path as an argument');
+    expect(content).toContain('## Step 4: Final Summary');
+    expect(content).toContain('`npm install -g @openai/codex`');
+  });
 });
 
 describe('Ralph — Shell Script (ralph.sh)', () => {
@@ -389,7 +428,8 @@ describe('README.md — Documentation', () => {
 
   test('documents skills in project structure', () => {
     expect(content).toContain('skills/');
-    expect(content).toContain('/prd, /ralph, and /codex-review slash commands');
+    expect(content).toContain('/prd, /ralph, and /codex-review skills');
+    expect(content).toContain('Project-local Codex skills: prd, ralph, codex-review');
   });
 
   test('documents ralph section with usage examples', () => {
