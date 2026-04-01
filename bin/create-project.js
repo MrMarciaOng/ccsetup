@@ -633,6 +633,17 @@ async function initializeCodexDirectory(conflictStrategy, dryRun) {
       skippedItems.push('.codex/');
     }
 
+    const topLevelEntries = fs.existsSync(templateCodexDir)
+      ? fs.readdirSync(templateCodexDir, { withFileTypes: true })
+          .filter(entry => entry.isFile())
+      : [];
+
+    for (const entry of topLevelEntries) {
+      const src = path.join(templateCodexDir, entry.name);
+      const dest = path.join(codexDir, entry.name);
+      copyCodexFile(src, dest, `.codex/${entry.name}`);
+    }
+
     if (!fs.existsSync(skillsDir)) {
       if (!dryRun) {
         fs.mkdirSync(skillsDir, { recursive: true });

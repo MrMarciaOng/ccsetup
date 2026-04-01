@@ -26,7 +26,8 @@ describe('Skills — Template File Structure', () => {
   test('codex skills directory mirrors core Claude skills', () => {
     expect(fs.existsSync(path.join(CODEX_SKILLS_DIR, 'prd', 'SKILL.md'))).toBe(true);
     expect(fs.existsSync(path.join(CODEX_SKILLS_DIR, 'ralph', 'SKILL.md'))).toBe(true);
-    expect(fs.existsSync(path.join(CODEX_SKILLS_DIR, 'codex-review', 'SKILL.md'))).toBe(true);
+    expect(fs.existsSync(path.join(CODEX_SKILLS_DIR, 'claude-review', 'SKILL.md'))).toBe(true);
+    expect(fs.existsSync(path.join(CODEX_SKILLS_DIR, 'secops', 'SKILL.md'))).toBe(true);
   });
 });
 
@@ -264,12 +265,22 @@ describe('Codex Skills — Mirrored Coverage', () => {
     expect(content).toContain('Story `notes` pre-populated with relevant file paths');
   });
 
-  test('codex review skill keeps full implementation-review guidance', () => {
-    const content = fs.readFileSync(path.join(CODEX_SKILLS_DIR, 'codex-review', 'SKILL.md'), 'utf8');
+  test('claude review skill keeps full implementation-review guidance', () => {
+    const content = fs.readFileSync(path.join(CODEX_SKILLS_DIR, 'claude-review', 'SKILL.md'), 'utf8');
+    expect(content).toContain('Claude Review');
     expect(content).toContain('Implementation review');
     expect(content).toContain('you MUST pass the plan file path as an argument');
     expect(content).toContain('## Step 4: Final Summary');
-    expect(content).toContain('`npm install -g @openai/codex`');
+    expect(content).toContain('bash scripts/claude-review/claude-review.sh');
+  });
+
+  test('codex secops skill carries the same install-blocking security workflow', () => {
+    const content = fs.readFileSync(path.join(CODEX_SKILLS_DIR, 'secops', 'SKILL.md'), 'utf8');
+    expect(content).toContain('MANDATORY SECOPS POLICY');
+    expect(content).toContain('osv-scanner');
+    expect(content).toContain('BEFORE installing ANY dependencies');
+    expect(content).toContain('If vulnerabilities are found:** STOP');
+    expect(content).toContain('Codex does not use `.claude/settings.json`');
   });
 });
 
@@ -428,8 +439,8 @@ describe('README.md — Documentation', () => {
 
   test('documents skills in project structure', () => {
     expect(content).toContain('skills/');
-    expect(content).toContain('/prd, /ralph, and /codex-review skills');
-    expect(content).toContain('Project-local Codex skills: prd, ralph, codex-review');
+    expect(content).toContain('/prd, /ralph, /codex-review, and /secops skills');
+    expect(content).toContain('Project-local Codex skills: prd, ralph, claude-review');
   });
 
   test('documents ralph section with usage examples', () => {

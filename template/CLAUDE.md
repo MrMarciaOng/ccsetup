@@ -104,7 +104,7 @@ When unset, the hook is inactive and Claude uses its default behavior. Install t
 
 ## Codex Review Hook (Optional)
 
-An optional hook that suggests running `/codex-review` when a plan file is modified or code changes are detected. Triggers on the `Stop` event.
+An optional hook that suggests running `/codex-review` when a plan file or `scripts/ralph/prd.json` is modified, or when code changes are detected. Triggers on the `Stop` event.
 
 To activate:
 ```bash

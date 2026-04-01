@@ -14,6 +14,9 @@ if (!enabled || (enabled !== '1' && enabled.toLowerCase() !== 'true')) {
 
 const PLAN_DIRS = ['plans'];
 const PLAN_PATTERN = /plan.*\.md$/i;
+const RALPH_REVIEWABLE_FILES = [
+  path.join('scripts', 'ralph', 'prd.json'),
+];
 const RECENCY_THRESHOLD_MS = 60 * 1000;
 
 function findRecentlyModifiedPlans() {
@@ -58,6 +61,27 @@ function findRecentlyModifiedPlans() {
   return recentPlans;
 }
 
+function findRecentlyModifiedRalphFiles() {
+  const now = Date.now();
+  const recentFiles = [];
+
+  for (const relativePath of RALPH_REVIEWABLE_FILES) {
+    const fullPath = path.join(process.cwd(), relativePath);
+    if (!fs.existsSync(fullPath)) continue;
+
+    try {
+      const stats = fs.statSync(fullPath);
+      if (stats.isFile() && now - stats.mtimeMs < RECENCY_THRESHOLD_MS) {
+        recentFiles.push(relativePath);
+      }
+    } catch (err) {
+      // Skip files we can't stat/read
+    }
+  }
+
+  return recentFiles;
+}
+
 function hasGitChanges() {
   try {
     execSync('git diff HEAD --quiet', { stdio: 'pipe' });
@@ -79,6 +103,7 @@ process.stdin.on('data', (chunk) => {
 process.stdin.on('end', () => {
   try {
     const recentPlans = findRecentlyModifiedPlans();
+    const recentRalphFiles = findRecentlyModifiedRalphFiles();
     const gitChanges = hasGitChanges();
     let output = {};
 
@@ -91,6 +116,16 @@ process.stdin.on('end', () => {
       const planNames = recentPlans.map(p => path.basename(p)).join(', ');
       output = {
         message: `Plan created. Run /codex-review for a second opinion from Codex CLI. (${planNames})`
+      };
+    } else if (recentRalphFiles.length > 0 && gitChanges) {
+      const fileList = recentRalphFiles.join(', ');
+      output = {
+        message: `Ralph PRD updated with code changes. Run /codex-review to validate story breakdown and implementation context. (${fileList})`
+      };
+    } else if (recentRalphFiles.length > 0) {
+      const fileList = recentRalphFiles.join(', ');
+      output = {
+        message: `Ralph PRD created. Run /codex-review for a second opinion on the generated stories. (${fileList})`
       };
     } else if (gitChanges) {
       output = {

@@ -1,6 +1,8 @@
 #!/bin/bash
 # Ralph Wiggum - Long-running AI agent loop
 # Usage: ./ralph.sh [--tool claude|codex] [--model <model>] [max_iterations]
+#   --tool claude -> runs instructions from CLAUDE.md with Claude Code
+#   --tool codex  -> runs instructions from CODEX.md with Codex CLI
 
 set -e
 
@@ -108,7 +110,13 @@ if [ ! -f "$PROGRESS_FILE" ]; then
 fi
 
 MODEL_DISPLAY="${MODEL:-default}"
+PROMPT_FILE="$CLAUDE_PROMPT_FILE"
+if [[ "$TOOL" == "codex" ]]; then
+  PROMPT_FILE="$CODEX_PROMPT_FILE"
+fi
+
 echo "Starting Ralph - Tool: $TOOL - Model: $MODEL_DISPLAY - Max iterations: $MAX_ITERATIONS"
+echo "Instruction file: $(basename "$PROMPT_FILE")"
 
 for i in $(seq 1 $MAX_ITERATIONS); do
   echo ""

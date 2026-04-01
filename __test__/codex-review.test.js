@@ -239,6 +239,47 @@ describe('Hook Plan Detection Logic', () => {
       cleanup(tmpDir);
     }
   });
+
+  test('detects recently modified scripts/ralph/prd.json', () => {
+    const tmpDir = makeTempDir();
+    try {
+      const ralphDir = path.join(tmpDir, 'scripts', 'ralph');
+      fs.mkdirSync(ralphDir, { recursive: true });
+      fs.writeFileSync(path.join(ralphDir, 'prd.json'), '{"project":"Test"}');
+
+      const result = runHook(tmpDir, { CCSETUP_CODEX_REVIEW: '1' });
+      expect(result.status).toBe(0);
+
+      const output = JSON.parse(result.stdout.trim());
+      expect(output).toHaveProperty('message');
+      expect(output.message).toContain('codex-review');
+      expect(output.message).toContain('scripts/ralph/prd.json');
+      expect(output.message).toContain('generated stories');
+    } finally {
+      cleanup(tmpDir);
+    }
+  });
+
+  test('prioritizes recent plan files over Ralph PRD suggestions', () => {
+    const tmpDir = makeTempDir();
+    try {
+      const plansDir = path.join(tmpDir, 'plans');
+      const ralphDir = path.join(tmpDir, 'scripts', 'ralph');
+      fs.mkdirSync(plansDir, { recursive: true });
+      fs.mkdirSync(ralphDir, { recursive: true });
+      fs.writeFileSync(path.join(plansDir, 'feature-plan.md'), '# Plan');
+      fs.writeFileSync(path.join(ralphDir, 'prd.json'), '{"project":"Test"}');
+
+      const result = runHook(tmpDir, { CCSETUP_CODEX_REVIEW: '1' });
+      expect(result.status).toBe(0);
+
+      const output = JSON.parse(result.stdout.trim());
+      expect(output.message).toContain('feature-plan.md');
+      expect(output.message).not.toContain('scripts/ralph/prd.json');
+    } finally {
+      cleanup(tmpDir);
+    }
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

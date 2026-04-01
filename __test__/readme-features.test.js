@@ -57,9 +57,11 @@ describe('Template Source Verification', () => {
     expect(fs.existsSync(path.join(TEMPLATE_DIR, 'AGENTS.md'))).toBe(true);
     expect(fs.existsSync(path.join(TEMPLATE_DIR, '.claude', 'settings.json'))).toBe(true);
     expect(fs.existsSync(path.join(TEMPLATE_DIR, '.codex', 'install-skills.sh'))).toBe(false);
+    expect(fs.existsSync(path.join(TEMPLATE_DIR, '.codex', 'README.md'))).toBe(true);
     expect(fs.existsSync(path.join(TEMPLATE_DIR, '.codex', 'skills', 'prd', 'SKILL.md'))).toBe(true);
     expect(fs.existsSync(path.join(TEMPLATE_DIR, '.codex', 'skills', 'ralph', 'SKILL.md'))).toBe(true);
-    expect(fs.existsSync(path.join(TEMPLATE_DIR, '.codex', 'skills', 'codex-review', 'SKILL.md'))).toBe(true);
+    expect(fs.existsSync(path.join(TEMPLATE_DIR, '.codex', 'skills', 'claude-review', 'SKILL.md'))).toBe(true);
+    expect(fs.existsSync(path.join(TEMPLATE_DIR, '.codex', 'skills', 'secops', 'SKILL.md'))).toBe(true);
     expect(fs.existsSync(path.join(TEMPLATE_DIR, '.codex', 'skills', 'project-workflow'))).toBe(false);
     expect(fs.existsSync(path.join(TEMPLATE_DIR, '.codex', 'skills-src'))).toBe(false);
     expect(fs.existsSync(path.join(TEMPLATE_DIR, 'docs', 'ROADMAP.md'))).toBe(true);

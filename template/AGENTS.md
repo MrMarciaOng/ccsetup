@@ -7,7 +7,7 @@
 ## Primary Working Files
 
 - `AGENTS.md` — project-specific guidance for Codex
-- `.codex/skills/` — project-local Codex skills for this project (`prd`, `ralph`, `codex-review`)
+- `.codex/skills/` — project-local Codex skills for this project (`prd`, `ralph`, `claude-review`, `secops`)
 - `docs/codex-setup.md` — Codex setup notes for this repo
 - `docs/ROADMAP.md` — project goals and status
 - `tickets/` — task tracking
@@ -24,8 +24,9 @@
 
 - Use plans in `plans/` for larger features.
 - Track implementation work in `tickets/`.
-- Use `scripts/codex-review/codex-review.sh` when you want a second-opinion review from Codex CLI.
-- Use `scripts/ralph/ralph.sh --tool codex` for Ralph runs through Codex CLI.
+- Run `scripts/ralph/ralph.sh --tool codex` to execute the Codex Ralph loop using `scripts/ralph/CODEX.md`.
+- Use `scripts/claude-review/claude-review.sh` when you want a second-opinion review from Claude Code.
+- Typical Codex flow: `/prd` -> `/ralph` -> `scripts/ralph/ralph.sh --tool codex` -> `scripts/claude-review/claude-review.sh`.
 
 ## Codex Skills
 
@@ -33,7 +34,8 @@ This project ships project-local Codex skills in `.codex/skills/`, mirroring the
 
 - `prd`
 - `ralph`
-- `codex-review`
+- `claude-review`
+- `secops`
 
 Keep these skills in the repository alongside `AGENTS.md` and the project docs.
 

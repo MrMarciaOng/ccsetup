@@ -1,6 +1,6 @@
 # Hooks System
 
-ccsetup includes an optional workflow-selection hook that analyzes prompts and suggests agent sequences.
+ccsetup includes optional Claude hooks for workflow selection and Codex review suggestions.
 
 ## Installation
 
@@ -13,6 +13,11 @@ npx ccsetup my-project
 ```
 
 Installation is non-destructive: detects existing hooks, creates backups, merges configurations, and skips duplicates.
+
+## Included Hooks
+
+- `workflow-selector` on `UserPromptSubmit` suggests agent sequences for the prompt.
+- `codex-review` on `Stop` suggests `/codex-review` after recent plan updates, Ralph `scripts/ralph/prd.json` generation, or code changes.
 
 ## How It Works
 

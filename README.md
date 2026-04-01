@@ -31,11 +31,13 @@ my-project/
 │   ├── skills/            # /prd, /ralph, /codex-review, and /secops skills
 │   └── settings.json      # Claude permissions and optional hook wiring
 ├── .codex/
-│   └── skills/            # Project-local Codex skills: prd, ralph, codex-review
+│   ├── README.md          # Codex directory notes
+│   └── skills/            # Project-local Codex skills: prd, ralph, claude-review, secops
 ├── agents/
 │   └── README.md          # Agent documentation
 ├── scripts/
 │   ├── ralph/             # Autonomous agent loop for Claude Code or Codex
+│   ├── claude-review/     # Claude Code review script
 │   └── codex-review/      # Codex CLI review script
 ├── docs/
 │   ├── ROADMAP.md         # Development roadmap
@@ -52,10 +54,11 @@ backend, blockchain, checker, coder, frontend, planner, researcher, shadcn
 
 - **/prd** — Scans your codebase (tech stack, quality gates, architecture), then generates a structured PRD with real file paths and auto-detected quality criteria
 - **/ralph** — Converts a PRD into `prd.json` format for autonomous execution, with exact quality check commands and file hints per story
-- **/codex-review** — Reviews plans, validates implementations against plans, or reviews code changes via Codex CLI. Auto-detects mode from context, up to 3 iterative rounds
-- **/secops** — Claude-only security skill that blocks dependency installs until `osv-scanner` checks the package or lockfile for known vulnerabilities
+- **/codex-review** — Claude-facing cross-model review skill that reviews plans, validates implementations against plans, or reviews code changes via Codex CLI
+- **/claude-review** — Codex-facing cross-model review skill that reviews plans, validates implementations against plans, or reviews code changes via Claude Code
+- **/secops** — Security skill that blocks dependency installs until `osv-scanner` checks the package or lockfile for known vulnerabilities
 
-Claude projects also ship with `osv-scanner` Bash permissions preconfigured in `.claude/settings.json` so the `/secops` workflow can run without extra permission prompts.
+Claude projects also ship with `osv-scanner` Bash permissions preconfigured in `.claude/settings.json` so the `/secops` workflow can run without extra permission prompts. Codex projects get the same workflow guidance in `.codex/skills/secops/SKILL.md`, but without Claude-specific hook or permission wiring.
 
 ## Key Options
 
@@ -151,7 +154,7 @@ cat plans/my-plan.md | ./scripts/codex-review/codex-review.sh -
 
 ### Codex Review Hook (Optional)
 
-An optional hook that suggests running `/codex-review` when plan files are modified or code changes are detected. Triggers on the `Stop` event.
+An optional hook that suggests running `/codex-review` when plan files or `scripts/ralph/prd.json` are modified, or when code changes are detected. Triggers on the `Stop` event.
 
 **To activate:**
 
@@ -188,6 +191,8 @@ Ralph is an autonomous coding agent that implements user stories from a PRD one 
 ./scripts/ralph/ralph.sh --tool codex --model gpt-5 5
 ```
 
+Codex mode uses `scripts/ralph/CODEX.md`, reads `scripts/ralph/prd.json`, and appends progress to `scripts/ralph/progress.txt`.
+
 ### What happens each iteration
 
 1. Reads `prd.json` and picks the next incomplete story
@@ -216,6 +221,13 @@ Ralph auto-archives previous runs when the branch changes. Archives are saved to
 1. **`jq` installed** for PRD parsing and branch tracking
 2. **Claude Code CLI** for the default runner
 3. **Codex CLI** if you want `--tool codex`: `npm install -g @openai/codex`
+
+Typical Codex workflow:
+
+1. Run `/prd`
+2. Run `/ralph`
+3. Run `./scripts/ralph/ralph.sh --tool codex`
+4. Run `./scripts/claude-review/claude-review.sh` for a cross-model review when needed
 
 ## Documentation
 

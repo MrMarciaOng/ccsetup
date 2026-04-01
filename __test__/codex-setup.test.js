@@ -49,10 +49,12 @@ describe('AI Provider Setup', () => {
     const projDir = createProject('codex-only', { CCSETUP_AI_PROVIDER: 'codex' });
 
     expect(fs.existsSync(path.join(projDir, 'AGENTS.md'))).toBe(true);
+    expect(fs.existsSync(path.join(projDir, '.codex', 'README.md'))).toBe(true);
     expect(fs.existsSync(path.join(projDir, '.codex', 'install-skills.sh'))).toBe(false);
     expect(fs.existsSync(path.join(projDir, '.codex', 'skills', 'prd', 'SKILL.md'))).toBe(true);
     expect(fs.existsSync(path.join(projDir, '.codex', 'skills', 'ralph', 'SKILL.md'))).toBe(true);
-    expect(fs.existsSync(path.join(projDir, '.codex', 'skills', 'codex-review', 'SKILL.md'))).toBe(true);
+    expect(fs.existsSync(path.join(projDir, '.codex', 'skills', 'claude-review', 'SKILL.md'))).toBe(true);
+    expect(fs.existsSync(path.join(projDir, '.codex', 'skills', 'secops', 'SKILL.md'))).toBe(true);
     expect(fs.existsSync(path.join(projDir, '.codex', 'skills', 'project-workflow'))).toBe(false);
     expect(fs.existsSync(path.join(projDir, 'docs', 'codex-setup.md'))).toBe(true);
     expect(fs.existsSync(path.join(projDir, 'CLAUDE.md'))).toBe(false);
@@ -65,9 +67,11 @@ describe('AI Provider Setup', () => {
     expect(fs.existsSync(path.join(projDir, 'CLAUDE.md'))).toBe(true);
     expect(fs.existsSync(path.join(projDir, '.claude', 'settings.json'))).toBe(true);
     expect(fs.existsSync(path.join(projDir, 'AGENTS.md'))).toBe(true);
+    expect(fs.existsSync(path.join(projDir, '.codex', 'README.md'))).toBe(true);
     expect(fs.existsSync(path.join(projDir, '.codex', 'skills', 'prd', 'SKILL.md'))).toBe(true);
     expect(fs.existsSync(path.join(projDir, '.codex', 'skills', 'ralph', 'SKILL.md'))).toBe(true);
-    expect(fs.existsSync(path.join(projDir, '.codex', 'skills', 'codex-review', 'SKILL.md'))).toBe(true);
+    expect(fs.existsSync(path.join(projDir, '.codex', 'skills', 'claude-review', 'SKILL.md'))).toBe(true);
+    expect(fs.existsSync(path.join(projDir, '.codex', 'skills', 'secops', 'SKILL.md'))).toBe(true);
   });
 
   test('--agents exits early in codex mode without Claude agent flow', () => {
