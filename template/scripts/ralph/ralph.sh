@@ -5,6 +5,186 @@
 #   --tool codex  -> runs instructions from CODEX.md with Codex CLI
 
 set -e
+set -o pipefail
+
+sanitize_script_output() {
+  perl -pe 's/\r/\n/g'
+}
+
+append_rendered_output() {
+  local text="$1"
+
+  if [[ -n "${RENDERED_OUTPUT_FILE:-}" ]]; then
+    printf '%s' "$text" >> "$RENDERED_OUTPUT_FILE"
+  fi
+}
+
+format_claude_stream_line() {
+  local line="$1"
+  local text=""
+  local tool_name=""
+  local event_type=""
+
+  text=$(printf '%s\n' "$line" | jq -r '
+    if .delta?.text? then .delta.text
+    elif .content_block?.text? then .content_block.text
+    elif .message?.content? then [.message.content[]? | select(.type? == "text") | .text] | join("")
+    elif .content? then [.content[]? | select(.type? == "text") | .text] | join("")
+    else empty end
+  ' 2>/dev/null)
+
+  if [[ -n "$text" ]]; then
+    append_rendered_output "$text"
+    printf '%s' "$text"
+    return
+  fi
+
+  event_type=$(printf '%s\n' "$line" | jq -r '.type? // empty' 2>/dev/null)
+  tool_name=$(printf '%s\n' "$line" | jq -r '.content_block?.name? // .delta?.name? // .name? // empty' 2>/dev/null)
+
+  case "$event_type" in
+    content_block_start)
+      if [[ -n "$tool_name" ]]; then
+        append_rendered_output "[claude] tool: $tool_name"$'\n'
+        echo "[claude] tool: $tool_name"
+      fi
+      ;;
+    message_stop)
+      append_rendered_output $'\n'
+      echo ""
+      ;;
+    *)
+      ;;
+  esac
+}
+
+format_codex_stream_line() {
+  local line="$1"
+  local text=""
+  local event_type=""
+  local exec_cmd=""
+
+  text=$(printf '%s\n' "$line" | jq -r '
+    if .delta? and (.delta | type == "string") then .delta
+    elif .message? and (.message | type == "string") then .message
+    elif .content? and (.content | type == "string") then .content
+    elif .text? and (.text | type == "string") then .text
+    elif .last_agent_message? and (.last_agent_message | type == "string") then .last_agent_message
+    else empty end
+  ' 2>/dev/null)
+
+  if [[ -n "$text" ]]; then
+    append_rendered_output "$text"
+    printf '%s' "$text"
+    return
+  fi
+
+  event_type=$(printf '%s\n' "$line" | jq -r '.event? // .type? // empty' 2>/dev/null)
+  exec_cmd=$(printf '%s\n' "$line" | jq -r '.command? // .cmd? // empty' 2>/dev/null)
+
+  case "$event_type" in
+    exec_command_begin|exec_command)
+      if [[ -n "$exec_cmd" ]]; then
+        append_rendered_output "[codex] command: $exec_cmd"$'\n'
+        echo "[codex] command: $exec_cmd"
+      fi
+      ;;
+    task_complete|completed)
+      append_rendered_output $'\n'
+      echo ""
+      ;;
+    *)
+      ;;
+  esac
+}
+
+run_native_stream() {
+  local tool="$1"
+  local output_file="$2"
+  local prompt_file="$3"
+  shift 3
+  local cmd=("$@")
+
+  : > "$output_file"
+
+  if [[ "$tool" == "claude" ]]; then
+    "${cmd[@]}" < "$prompt_file" 2>&1 | while IFS= read -r line || [[ -n "$line" ]]; do
+      printf '%s\n' "$line" >> "$output_file"
+      format_claude_stream_line "$line"
+    done
+  else
+    "${cmd[@]}" < "$prompt_file" 2>&1 | while IFS= read -r line || [[ -n "$line" ]]; do
+      printf '%s\n' "$line" >> "$output_file"
+      format_codex_stream_line "$line"
+    done
+  fi
+}
+
+run_pty_fallback() {
+  local output_file="$1"
+  local prompt_file="$2"
+  shift 2
+  local quoted_cmd=""
+  local arg=""
+
+  : > "$output_file"
+
+  for arg in "$@"; do
+    quoted_cmd+=" $(printf '%q' "$arg")"
+  done
+
+  script -q -F "$output_file" bash -lc "${quoted_cmd# } < $(printf '%q' "$prompt_file")" | sanitize_script_output
+}
+
+stream_progress_updates() {
+  local child_pid="$1"
+  local progress_file="$2"
+  local last_size="${3:-0}"
+  local idle_seconds=0
+  local current_size=0
+
+  while kill -0 "$child_pid" 2>/dev/null; do
+    if [[ -f "$progress_file" ]]; then
+      current_size=$(wc -c < "$progress_file" 2>/dev/null || echo 0)
+
+      if (( current_size < last_size )); then
+        last_size=0
+      fi
+
+      if (( current_size > last_size )); then
+        echo ""
+        echo "[ralph] progress.txt updated:"
+        tail -c +"$((last_size + 1))" "$progress_file" | sed 's/^/[progress] /'
+        last_size=$current_size
+        idle_seconds=0
+      else
+        idle_seconds=$((idle_seconds + 2))
+      fi
+    else
+      idle_seconds=$((idle_seconds + 2))
+    fi
+
+    if (( idle_seconds >= 20 )); then
+      echo "[ralph] still running... waiting for tool output or progress.txt updates"
+      idle_seconds=0
+    fi
+
+    sleep 2
+  done
+
+  if [[ -f "$progress_file" ]]; then
+    local final_size
+    final_size=$(wc -c < "$progress_file" 2>/dev/null || echo 0)
+    if (( final_size < last_size )); then
+      last_size=0
+    fi
+    if (( final_size > last_size )); then
+      echo ""
+      echo "[ralph] progress.txt updated:"
+      tail -c +"$((last_size + 1))" "$progress_file" | sed 's/^/[progress] /'
+    fi
+  fi
+}
 
 # Parse arguments
 TOOL="claude"
@@ -118,6 +298,10 @@ fi
 echo "Starting Ralph - Tool: $TOOL - Model: $MODEL_DISPLAY - Max iterations: $MAX_ITERATIONS"
 echo "Instruction file: $(basename "$PROMPT_FILE")"
 
+if [[ -f "$PROGRESS_FILE" ]]; then
+  echo "Progress log: $PROGRESS_FILE"
+fi
+
 for i in $(seq 1 $MAX_ITERATIONS); do
   echo ""
   echo "==============================================================="
@@ -125,20 +309,58 @@ for i in $(seq 1 $MAX_ITERATIONS); do
   echo "==============================================================="
 
   # Run the selected tool with the ralph prompt
+  OUTPUT_FILE=$(mktemp)
+  RENDERED_OUTPUT_FILE=$(mktemp)
+  PROGRESS_SIZE_BEFORE=$(wc -c < "$PROGRESS_FILE" 2>/dev/null || echo 0)
+  EXIT_CODE=0
+
   if [[ "$TOOL" == "claude" ]]; then
-    # Claude Code: use --dangerously-skip-permissions for autonomous operation, --print for output
-    MODEL_FLAG=""
+    # Prefer structured stream output for readable live logs, with PTY fallback for stubborn buffering.
+    STREAM_CMD=(
+      claude
+      --dangerously-skip-permissions
+      --chrome
+      --print
+      --output-format stream-json
+      --include-partial-messages
+    )
+    FALLBACK_CMD=(claude --dangerously-skip-permissions --chrome --print)
     if [[ -n "$MODEL" ]]; then
-      MODEL_FLAG="--model $MODEL"
+      STREAM_CMD+=(--model "$MODEL")
+      FALLBACK_CMD+=(--model "$MODEL")
     fi
-    OUTPUT=$(claude $MODEL_FLAG --dangerously-skip-permissions --chrome --print < "$CLAUDE_PROMPT_FILE" 2>&1 | tee /dev/stderr) || true
+    (
+      if ! run_native_stream "$TOOL" "$OUTPUT_FILE" "$CLAUDE_PROMPT_FILE" "${STREAM_CMD[@]}"; then
+        echo ""
+        echo "[ralph] native stream mode failed; retrying with PTY fallback"
+        run_pty_fallback "$OUTPUT_FILE" "$CLAUDE_PROMPT_FILE" "${FALLBACK_CMD[@]}"
+      fi
+    ) &
   else
-    CMD_ARGS=()
+    STREAM_CMD=(codex exec --json)
+    FALLBACK_CMD=(codex exec)
     if [[ -n "$MODEL" ]]; then
-      CMD_ARGS+=(--model "$MODEL")
+      STREAM_CMD+=(--model "$MODEL")
+      FALLBACK_CMD+=(--model "$MODEL")
     fi
-    OUTPUT=$(codex exec ${CMD_ARGS[@]+"${CMD_ARGS[@]}"} "$(<"$CODEX_PROMPT_FILE")" 2>&1 | tee /dev/stderr) || true
+    (
+      if ! run_native_stream "$TOOL" "$OUTPUT_FILE" "$CODEX_PROMPT_FILE" "${STREAM_CMD[@]}"; then
+        echo ""
+        echo "[ralph] native stream mode failed; retrying with PTY fallback"
+        run_pty_fallback "$OUTPUT_FILE" "$CODEX_PROMPT_FILE" "${FALLBACK_CMD[@]}"
+      fi
+    ) &
   fi
+
+  TOOL_PID=$!
+  stream_progress_updates "$TOOL_PID" "$PROGRESS_FILE" "$PROGRESS_SIZE_BEFORE" &
+  MONITOR_PID=$!
+
+  wait "$TOOL_PID" || EXIT_CODE=$?
+  wait "$MONITOR_PID" || true
+  OUTPUT=$(cat "$OUTPUT_FILE" "$RENDERED_OUTPUT_FILE")
+  rm -f "$OUTPUT_FILE"
+  rm -f "$RENDERED_OUTPUT_FILE"
   
   # Check for completion signal
   if echo "$OUTPUT" | grep -q "<promise>COMPLETE</promise>"; then
@@ -148,7 +370,11 @@ for i in $(seq 1 $MAX_ITERATIONS); do
     exit 0
   fi
   
-  echo "Iteration $i complete. Continuing..."
+  if [[ "$EXIT_CODE" -ne 0 ]]; then
+    echo "Iteration $i exited with status $EXIT_CODE. Continuing..."
+  else
+    echo "Iteration $i complete. Continuing..."
+  fi
   sleep 2
 done
 
